@@ -52,7 +52,11 @@ const winSpeechNativeResource = {
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: 'com.stablyai.orca',
-  productName: 'Orca',
+  // Why (personal fork): rename the app so this build is distinguishable from the released
+  // Orca in Finder/Dock. appId deliberately unchanged — it's hardcoded in notifications.ts,
+  // dev-instance-identity.ts and the macOS helper build scripts, and desyncing it breaks
+  // notification delivery/permission deep-links.
+  productName: 'Orca Fork',
   directories: {
     buildResources: 'resources/build'
   },
@@ -75,6 +79,10 @@ module.exports = {
     // package time never bloats app.asar.
     '!pr-evidence{,/**/*}',
     '!Casks{,/**/*}',
+    // Why: `out/electron-dev/<hash>` is dev-run scratch (~275MB). CI packages from a clean
+    // checkout so it never appears there, but a local dev/test run before `build:mac` would
+    // otherwise ship it inside app.asar and inflate the bundle.
+    '!out/electron-dev{,/**/*}',
     '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md}',
     '!out/**/*.test.js',
     '!electron.vite.config.{js,ts,mjs,cjs}',
@@ -302,7 +310,7 @@ module.exports = {
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
   forceCodeSigning: isMacRelease,
   dmg: {
-    artifactName: 'orca-macos-${arch}.${ext}'
+    artifactName: 'orca-fork-macos-${arch}.${ext}'
   },
   linux: {
     // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
