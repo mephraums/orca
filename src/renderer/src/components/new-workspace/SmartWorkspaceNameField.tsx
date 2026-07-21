@@ -9,6 +9,7 @@ import {
   GitBranchPlus,
   GitMerge,
   GitPullRequest,
+  GitPullRequestDraft,
   LoaderCircle,
   Search,
   X
@@ -51,6 +52,11 @@ import { getRepoOwnerRoutedSettings } from '@/lib/repo-runtime-owner'
 import { cn } from '@/lib/utils'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import {
+  getTaskPageGitHubPRIconTone,
+  isTaskPageGitHubDraftPR
+} from '@/components/task-page-github-work-item-status'
+import { TaskPageGitHubWorkItemStateBadge } from '@/components/task-page-github-work-item-status-badge'
 import { searchRuntimeRepoBaseRefDetails } from '@/runtime/runtime-repo-client'
 import {
   buildSmartWorkspaceSourceRows,
@@ -1649,11 +1655,12 @@ function RowIcon({ row }: { row: RowEntry }): React.JSX.Element {
     return <GitBranchPlus className="size-3.5 shrink-0 text-muted-foreground" />
   }
   if (row.kind === 'github') {
-    return row.item.type === 'pr' ? (
-      <GitPullRequest className="size-3.5 shrink-0 text-muted-foreground" />
-    ) : (
-      <CircleDot className="size-3.5 shrink-0 text-muted-foreground" />
-    )
+    if (row.item.type === 'pr') {
+      // Why: tint the PR glyph by state (green = ready, gray draft glyph) so drafts read distinct from ready-for-review, matching the Tasks/PR-detail convention.
+      const PrIcon = isTaskPageGitHubDraftPR(row.item) ? GitPullRequestDraft : GitPullRequest
+      return <PrIcon className={cn('size-3.5 shrink-0', getTaskPageGitHubPRIconTone(row.item))} />
+    }
+    return <CircleDot className="size-3.5 shrink-0 text-muted-foreground" />
   }
   if (row.kind === 'gitlab') {
     // Why: MRs use GitMerge (not GitPullRequest, which reads like GitBranch at this size) and match gitlab.com's MR iconography.
@@ -1719,9 +1726,15 @@ function RowLabel({ row }: { row: RowEntry }): React.JSX.Element {
   }
   if (row.kind === 'github') {
     return (
-      <span className="min-w-0 truncate">
-        <span className="font-medium text-foreground">#{row.item.number}</span> {row.item.title}
-      </span>
+      <>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-foreground">#{row.item.number}</span> {row.item.title}
+        </span>
+        {/* Why: badge only drafts (ready stays unlabeled = quiet); shrink-0 keeps it visible while the title truncates. */}
+        {isTaskPageGitHubDraftPR(row.item) ? (
+          <TaskPageGitHubWorkItemStateBadge item={row.item} className="shrink-0" />
+        ) : null}
+      </>
     )
   }
   if (row.kind === 'gitlab') {
