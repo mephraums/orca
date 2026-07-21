@@ -1246,12 +1246,16 @@
         "noRunTargets": "No hay destinos de ejecución listos para este proyecto.",
         "perWorkspaceEnvHint": "Provisiona un entorno bajo demanda a partir de una receta",
         "branchName": "Nombre de rama",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "multiPrLabel": "Pull requests",
+        "multiPrToggle": "Select multiple"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Crear worktree",
         "createWorkspace": "Crear espacio de trabajo",
-        "fa90f739a5": "Elija el proyecto, el nombre del espacio de trabajo y el agente antes de crear el espacio de trabajo."
+        "fa90f739a5": "Elija el proyecto, el nombre del espacio de trabajo y el agente antes de crear el espacio de trabajo.",
+        "createOneWorktree": "Create 1 worktree",
+        "createCountWorktrees": "Create {{count}} worktrees"
       },
       "PullRequestPage": {
         "2560588245": "No se pudo solicitar el revisor",
@@ -10853,6 +10857,14 @@
             "search": "Buscar proyectos...",
             "empty": "Ningún proyecto coincide con tu búsqueda.",
             "addProject": "Add a new project"
+          },
+          "MultiPrSelectList": {
+            "search": "Search pull requests...",
+            "selectedCount": "{{count}} selected",
+            "hint": "Select the pull requests to open",
+            "clear": "Clear all",
+            "selectReady": "Select all ready",
+            "empty": "No open pull requests found."
           }
         }
       },

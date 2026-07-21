@@ -119,6 +119,12 @@ type NewWorkspaceComposerCardProps = {
   showCreateMultiple?: boolean
   createMultiple?: boolean
   onCreateMultipleChange?: (next: boolean) => void
+  /** Shows the "Select multiple" switch that swaps the name field for a PR checklist. */
+  showMultiPrToggle?: boolean
+  multiPrMode?: boolean
+  onMultiPrModeChange?: (next: boolean) => void
+  /** The PR checklist, rendered in place of the name field while `multiPrMode` is on. */
+  multiPrList?: React.ReactNode
   smartNameGitHubSourceContext?: TaskSourceContext | null
   /** Advisory shown under the name field when a fork PR can't accept maintainer pushes. */
   forkPushWarning: string | null
@@ -652,6 +658,10 @@ export default function NewWorkspaceComposerCard({
   showCreateMultiple = false,
   createMultiple = false,
   onCreateMultipleChange,
+  showMultiPrToggle = false,
+  multiPrMode = false,
+  onMultiPrModeChange,
+  multiPrList,
   smartNameGitHubSourceContext,
   forkPushWarning,
   detectedAgentIds,
@@ -984,111 +994,156 @@ export default function NewWorkspaceComposerCard({
         </div>
 
         <div className="min-w-0 space-y-1" data-contextual-tour-target="workspace-creation-name">
-          <label className="block min-w-0 truncate text-xs font-medium text-muted-foreground">
-            {selectedRepoIsGit
-              ? translate(
-                  'auto.components.NewWorkspaceComposerCard.ac3748dcda',
-                  "Name or 'Create From'"
-                )
-              : translate(
-                  'auto.components.NewWorkspaceComposerCard.0ee17638fe',
-                  'Workspace name'
-                )}{' '}
-            <span className="text-muted-foreground/70">
-              {translate('auto.components.NewWorkspaceComposerCard.0c5d6a479c', '[Optional]')}
-            </span>
-          </label>
-          <SmartWorkspaceNameField
-            inputRef={nameInputRef}
-            repos={eligibleRepos}
-            repoId={repoId}
-            onRepoChange={onRepoChange}
-            value={name}
-            onValueChange={onNameValueChange}
-            onGitHubItemSelect={onSmartGitHubItemSelect}
-            onGitLabItemSelect={onSmartGitLabItemSelect}
-            onBranchSelect={onSmartBranchSelect}
-            onLinearIssueSelect={onSmartLinearIssueSelect}
-            selectedSource={smartNameSelection}
-            onClearSelectedSource={onClearSmartNameSelection}
-            githubSourceContext={smartNameGitHubSourceContext}
-            disabled={selectedRepoRequiresConnection}
-            disabledPlaceholder={translate(
-              'auto.components.NewWorkspaceComposerCard.connectProjectFirst',
-              'Connect this project first'
-            )}
-            textOnly={!selectedRepoIsGit}
-            branchesEnabled={branchesEnabled}
-            repoBackedSourcesDisabled={repoBackedSourcesDisabled}
-            repoBackedSearchRepos={repoBackedSearchRepos}
-            allowCrossRepoProjectAdd={allowSmartNameAddProject}
-            crossRepoSwitchTarget={smartNameRepoSwitchTarget}
-            onActiveSourceModeChange={onSmartNameModeChange}
-            onPlainEnter={() => {
-              // Why: Enter advances focus to the Agent combobox rather than submitting, keeping keyboard flow through the form.
-              const root = composerRef?.current
-              const agentTrigger = root?.querySelector<HTMLElement>(
-                '[data-agent-combobox-root="true"][role="combobox"]'
-              )
-              agentTrigger?.focus()
-            }}
-          />
-          {forkPushWarning ? (
-            <p className="flex items-start gap-1.5 text-[11px] text-yellow-600 dark:text-yellow-500">
-              <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-              <span>{forkPushWarning}</span>
-            </p>
-          ) : null}
-          {/* Why (#5181): sits under the branch selection (not Name, which can differ) so reusing the picked branch is an explicit choice. */}
-          <div
-            className={cn(
-              'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
-              canReuseSelectedBranch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-            )}
-            aria-hidden={!canReuseSelectedBranch}
-          >
-            <div className="min-h-0">
-              <div className="space-y-1 pt-1">
-                <label className="group flex w-fit items-center gap-2 text-xs text-foreground">
+          <div className="flex items-center justify-between gap-2">
+            <label className="block min-w-0 truncate text-xs font-medium text-muted-foreground">
+              {multiPrMode
+                ? translate(
+                    'auto.components.NewWorkspaceComposerCard.multiPrLabel',
+                    'Pull requests'
+                  )
+                : selectedRepoIsGit
+                  ? translate(
+                      'auto.components.NewWorkspaceComposerCard.ac3748dcda',
+                      "Name or 'Create From'"
+                    )
+                  : translate(
+                      'auto.components.NewWorkspaceComposerCard.0ee17638fe',
+                      'Workspace name'
+                    )}{' '}
+              {multiPrMode ? null : (
+                <span className="text-muted-foreground/70">
+                  {translate('auto.components.NewWorkspaceComposerCard.0c5d6a479c', '[Optional]')}
+                </span>
+              )}
+            </label>
+            {showMultiPrToggle ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={multiPrMode}
+                onClick={() => onMultiPrModeChange?.(!multiPrMode)}
+                className="group flex shrink-0 cursor-pointer items-center gap-2 rounded-md text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent transition-colors',
+                    multiPrMode ? 'bg-foreground' : 'bg-muted-foreground/30'
+                  )}
+                >
                   <span
                     className={cn(
-                      'flex size-4 items-center justify-center rounded-[3px] border shadow-sm transition',
-                      reuseSelectedBranch
-                        ? 'border-emerald-500/60 bg-emerald-500 text-white'
-                        : 'border-foreground/20 bg-background dark:border-white/20 dark:bg-muted/10'
+                      'pointer-events-none block size-3.5 rounded-full bg-background shadow-sm transition-transform',
+                      multiPrMode ? 'translate-x-4' : 'translate-x-0.5'
                     )}
-                  >
-                    <Check
-                      className={cn(
-                        'size-3 transition-opacity',
-                        reuseSelectedBranch ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={reuseSelectedBranch}
-                    onChange={(event) => onReuseSelectedBranchChange(event.target.checked)}
-                    // Why: row is aria-hidden while collapsed, so disable the input too (no focusable control inside an aria-hidden tree).
-                    disabled={!canReuseSelectedBranch}
-                    className="sr-only"
                   />
-                  <span>
-                    {translate(
-                      'auto.components.NewWorkspaceComposerCard.reuseExistingBranch',
-                      'Reuse branch'
-                    )}
-                  </span>
-                </label>
-                <p className="pl-6 text-[11px] text-muted-foreground">
+                </span>
+                <span className="text-muted-foreground transition-colors group-hover:text-foreground">
                   {translate(
-                    'auto.components.NewWorkspaceComposerCard.reuseExistingBranchHint',
-                    'Check out the existing branch instead of creating a new one from it.'
+                    'auto.components.NewWorkspaceComposerCard.multiPrToggle',
+                    'Select multiple'
                   )}
-                </p>
-              </div>
-            </div>
+                </span>
+              </button>
+            ) : null}
           </div>
+          {multiPrMode ? (
+            multiPrList
+          ) : (
+            <>
+              <SmartWorkspaceNameField
+                inputRef={nameInputRef}
+                repos={eligibleRepos}
+                repoId={repoId}
+                onRepoChange={onRepoChange}
+                value={name}
+                onValueChange={onNameValueChange}
+                onGitHubItemSelect={onSmartGitHubItemSelect}
+                onGitLabItemSelect={onSmartGitLabItemSelect}
+                onBranchSelect={onSmartBranchSelect}
+                onLinearIssueSelect={onSmartLinearIssueSelect}
+                selectedSource={smartNameSelection}
+                onClearSelectedSource={onClearSmartNameSelection}
+                githubSourceContext={smartNameGitHubSourceContext}
+                disabled={selectedRepoRequiresConnection}
+                disabledPlaceholder={translate(
+                  'auto.components.NewWorkspaceComposerCard.connectProjectFirst',
+                  'Connect this project first'
+                )}
+                textOnly={!selectedRepoIsGit}
+                branchesEnabled={branchesEnabled}
+                repoBackedSourcesDisabled={repoBackedSourcesDisabled}
+                repoBackedSearchRepos={repoBackedSearchRepos}
+                allowCrossRepoProjectAdd={allowSmartNameAddProject}
+                crossRepoSwitchTarget={smartNameRepoSwitchTarget}
+                onActiveSourceModeChange={onSmartNameModeChange}
+                onPlainEnter={() => {
+                  // Why: Enter advances focus to the Agent combobox rather than submitting, keeping keyboard flow through the form.
+                  const root = composerRef?.current
+                  const agentTrigger = root?.querySelector<HTMLElement>(
+                    '[data-agent-combobox-root="true"][role="combobox"]'
+                  )
+                  agentTrigger?.focus()
+                }}
+              />
+              {forkPushWarning ? (
+                <p className="flex items-start gap-1.5 text-[11px] text-yellow-600 dark:text-yellow-500">
+                  <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                  <span>{forkPushWarning}</span>
+                </p>
+              ) : null}
+              {/* Why (#5181): sits under the branch selection (not Name, which can differ) so reusing the picked branch is an explicit choice. */}
+              <div
+                className={cn(
+                  'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+                  canReuseSelectedBranch ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                )}
+                aria-hidden={!canReuseSelectedBranch}
+              >
+                <div className="min-h-0">
+                  <div className="space-y-1 pt-1">
+                    <label className="group flex w-fit items-center gap-2 text-xs text-foreground">
+                      <span
+                        className={cn(
+                          'flex size-4 items-center justify-center rounded-[3px] border shadow-sm transition',
+                          reuseSelectedBranch
+                            ? 'border-emerald-500/60 bg-emerald-500 text-white'
+                            : 'border-foreground/20 bg-background dark:border-white/20 dark:bg-muted/10'
+                        )}
+                      >
+                        <Check
+                          className={cn(
+                            'size-3 transition-opacity',
+                            reuseSelectedBranch ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={reuseSelectedBranch}
+                        onChange={(event) => onReuseSelectedBranchChange(event.target.checked)}
+                        // Why: row is aria-hidden while collapsed, so disable the input too (no focusable control inside an aria-hidden tree).
+                        disabled={!canReuseSelectedBranch}
+                        className="sr-only"
+                      />
+                      <span>
+                        {translate(
+                          'auto.components.NewWorkspaceComposerCard.reuseExistingBranch',
+                          'Reuse branch'
+                        )}
+                      </span>
+                    </label>
+                    <p className="pl-6 text-[11px] text-muted-foreground">
+                      {translate(
+                        'auto.components.NewWorkspaceComposerCard.reuseExistingBranchHint',
+                        'Check out the existing branch instead of creating a new one from it.'
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="space-y-1" data-contextual-tour-target="workspace-creation-agent">

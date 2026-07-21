@@ -1246,12 +1246,16 @@
         "noRunTargets": "이 프로젝트에는 실행 대상이 준비되어 있지 않습니다.",
         "perWorkspaceEnvHint": "레시피에서 온디맨드 환경 프로비저닝",
         "branchName": "브랜치 이름",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "multiPrLabel": "Pull requests",
+        "multiPrToggle": "Select multiple"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "작업 트리 만들기",
         "createWorkspace": "워크스페이스 만들기",
-        "fa90f739a5": "워크스페이스를 만들기 전에 프로젝트, 워크스페이스 이름, agent를 선택하세요."
+        "fa90f739a5": "워크스페이스를 만들기 전에 프로젝트, 워크스페이스 이름, agent를 선택하세요.",
+        "createOneWorktree": "Create 1 worktree",
+        "createCountWorktrees": "Create {{count}} worktrees"
       },
       "PullRequestPage": {
         "2560588245": "리뷰어를 요청하지 못했습니다.",
@@ -10853,6 +10857,14 @@
             "search": "프로젝트 검색...",
             "empty": "검색과 일치하는 프로젝트가 없습니다.",
             "addProject": "Add a new project"
+          },
+          "MultiPrSelectList": {
+            "search": "Search pull requests...",
+            "selectedCount": "{{count}} selected",
+            "hint": "Select the pull requests to open",
+            "clear": "Clear all",
+            "selectReady": "Select all ready",
+            "empty": "No open pull requests found."
           }
         }
       },

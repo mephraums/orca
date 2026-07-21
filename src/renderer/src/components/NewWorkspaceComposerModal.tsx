@@ -19,7 +19,11 @@ import {
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
+import MultiPrSelectList, { prSelectionKey } from '@/components/new-workspace/MultiPrSelectList'
+import { createWorktreesFromPRs, getBatchPrWorktreeSummary } from '@/lib/create-worktrees-from-prs'
+import { toast } from 'sonner'
 import type {
+  GitHubWorkItem,
   TuiAgent,
   WorkspaceCreateTelemetrySource,
   WorkspaceStatus
@@ -95,7 +99,7 @@ function ComposerModalBody({
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden sm:max-w-lg"
+        className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden sm:max-w-xl"
         onOpenAutoFocus={(event) => {
           // Why: Radix's FocusScope fires this once the dialog has mounted.
           // preventDefault stops it from focusing whatever first-tabbable it
@@ -186,9 +190,65 @@ function QuickTabBody({
     setQuickAgentOverride(agent)
   }, [])
 
+  // Why: multi-PR batch state lives here, not in useComposerState — the composer hook models a
+  // single linked work item throughout, so a parallel path keeps the single-select flow untouched.
+  const [multiPrMode, setMultiPrMode] = useState(false)
+  const [selectedPrs, setSelectedPrs] = useState<GitHubWorkItem[]>([])
+  const [batchCreating, setBatchCreating] = useState(false)
+  const selectedPrKeys = useMemo(
+    () => new Set(selectedPrs.map((item) => prSelectionKey(item))),
+    [selectedPrs]
+  )
+  const handleTogglePr = useCallback((item: GitHubWorkItem): void => {
+    setSelectedPrs((prev) => {
+      const key = prSelectionKey(item)
+      return prev.some((entry) => prSelectionKey(entry) === key)
+        ? prev.filter((entry) => prSelectionKey(entry) !== key)
+        : [...prev, item]
+    })
+  }, [])
+  const handleMultiPrModeChange = useCallback((next: boolean): void => {
+    setMultiPrMode(next)
+    if (!next) {
+      setSelectedPrs([])
+    }
+  }, [])
+
   const handleCreate = useCallback(async (): Promise<void> => {
+    if (multiPrMode) {
+      if (selectedPrs.length === 0 || batchCreating) {
+        return
+      }
+      setBatchCreating(true)
+      try {
+        const result = await createWorktreesFromPRs({
+          items: selectedPrs,
+          repoId: cardProps.repoId,
+          agent: quickAgent,
+          ...(modalData.telemetrySource ? { telemetrySource: modalData.telemetrySource } : {})
+        })
+        if (result.created > 0) {
+          toast.success(getBatchPrWorktreeSummary(result))
+          onClose()
+        } else {
+          toast.error(getBatchPrWorktreeSummary(result))
+        }
+      } finally {
+        setBatchCreating(false)
+      }
+      return
+    }
     await submitQuick(quickAgent)
-  }, [quickAgent, submitQuick])
+  }, [
+    batchCreating,
+    cardProps.repoId,
+    modalData.telemetrySource,
+    multiPrMode,
+    onClose,
+    quickAgent,
+    selectedPrs,
+    submitQuick
+  ])
   // Why: Add Project layers over the composer as a nested dialog instead of
   // replacing it in the activeModal slot — closing the composer mid-flow (and
   // losing the typed name/prompt) was the old, abrupt behavior. Once opened it
@@ -236,6 +296,26 @@ function QuickTabBody({
     : cardProps.selectedRepoIsGit
       ? translate('auto.components.NewWorkspaceComposerModal.createWorktree', 'Create worktree')
       : translate('auto.components.NewWorkspaceComposerModal.createWorkspace', 'Create workspace')
+  // Why: only the button reflects the batch count — the dialog title stays stable so it doesn't
+  // rewrite itself on every checkbox toggle.
+  const cardPrimaryActionLabel =
+    multiPrMode && selectedPrs.length > 0
+      ? selectedPrs.length === 1
+        ? translate(
+            'auto.components.NewWorkspaceComposerModal.createOneWorktree',
+            'Create 1 worktree'
+          )
+        : translate(
+            'auto.components.NewWorkspaceComposerModal.createCountWorktrees',
+            'Create {{count}} worktrees',
+            { count: selectedPrs.length }
+          )
+      : primaryActionLabel
+  const selectedComposerRepo = cardProps.eligibleRepos.find((repo) => repo.id === cardProps.repoId)
+  const showMultiPrToggle = !isFolderWorkspaceTarget && cardProps.selectedRepoIsGit
+  const effectiveCreateDisabled = multiPrMode
+    ? selectedPrs.length === 0 || batchCreating
+    : createDisabled
 
   // Cmd/Ctrl+Enter submits, Esc first blurs the focused input (like the full page).
   const nestedDialogOpen = agentSettingsOpen || addProjectOpen
@@ -279,7 +359,7 @@ function QuickTabBody({
       if (!shouldAllowComposerEnterSubmitTarget(target, composerRef.current)) {
         return
       }
-      if (createDisabled) {
+      if (effectiveCreateDisabled) {
         return
       }
       event.preventDefault()
@@ -287,7 +367,7 @@ function QuickTabBody({
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [active, composerRef, createDisabled, handleCreate, nestedDialogOpen, onClose])
+  }, [active, composerRef, effectiveCreateDisabled, handleCreate, nestedDialogOpen, onClose])
 
   return (
     <>
@@ -319,7 +399,23 @@ function QuickTabBody({
         quickAgent={quickAgent}
         onQuickAgentChange={handleQuickAgentChange}
         {...cardProps}
-        primaryActionLabel={primaryActionLabel}
+        primaryActionLabel={cardPrimaryActionLabel}
+        createDisabled={effectiveCreateDisabled}
+        creating={cardProps.creating || batchCreating}
+        showMultiPrToggle={showMultiPrToggle}
+        multiPrMode={multiPrMode}
+        onMultiPrModeChange={handleMultiPrModeChange}
+        multiPrList={
+          multiPrMode && selectedComposerRepo ? (
+            <MultiPrSelectList
+              repoId={cardProps.repoId}
+              repoPath={selectedComposerRepo.path}
+              selectedKeys={selectedPrKeys}
+              onToggle={handleTogglePr}
+              onReplaceSelection={setSelectedPrs}
+            />
+          ) : null
+        }
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}
         onCreate={() => void handleCreate()}
         onAddProjectOverride={handleOpenAddProject}

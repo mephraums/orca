@@ -1246,12 +1246,16 @@
         "noRunTargets": "此项目还没有可用的运行目标。",
         "perWorkspaceEnvHint": "通过环境模板按需创建环境",
         "branchName": "分支名称",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "multiPrLabel": "Pull requests",
+        "multiPrToggle": "Select multiple"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建工作树",
         "createWorkspace": "创建工作区",
-        "fa90f739a5": "创建工作区之前选择项目、工作区名称和智能体。"
+        "fa90f739a5": "创建工作区之前选择项目、工作区名称和智能体。",
+        "createOneWorktree": "Create 1 worktree",
+        "createCountWorktrees": "Create {{count}} worktrees"
       },
       "PullRequestPage": {
         "2560588245": "请求评审人失败",
@@ -10853,6 +10857,14 @@
             "search": "搜索项目...",
             "empty": "没有匹配搜索的项目。",
             "addProject": "Add a new project"
+          },
+          "MultiPrSelectList": {
+            "search": "Search pull requests...",
+            "selectedCount": "{{count}} selected",
+            "hint": "Select the pull requests to open",
+            "clear": "Clear all",
+            "selectReady": "Select all ready",
+            "empty": "No open pull requests found."
           }
         }
       },

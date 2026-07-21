@@ -1269,12 +1269,16 @@
         "noRunTargets": "No run targets are ready for this project.",
         "perWorkspaceEnvHint": "Provision an on-demand environment from a recipe",
         "branchName": "Branch name",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "multiPrLabel": "Pull requests",
+        "multiPrToggle": "Select multiple"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
         "createWorkspace": "Create workspace",
-        "fa90f739a5": "Choose the project, workspace name, and agent before creating the workspace."
+        "fa90f739a5": "Choose the project, workspace name, and agent before creating the workspace.",
+        "createOneWorktree": "Create 1 worktree",
+        "createCountWorktrees": "Create {{count}} worktrees"
       },
       "PullRequestPage": {
         "2560588245": "Failed to request reviewer",
@@ -10876,6 +10880,14 @@
             "search": "Search projects...",
             "empty": "No projects match your search.",
             "addProject": "Add a new project"
+          },
+          "MultiPrSelectList": {
+            "search": "Search pull requests...",
+            "selectedCount": "{{count}} selected",
+            "hint": "Select the pull requests to open",
+            "clear": "Clear all",
+            "selectReady": "Select all ready",
+            "empty": "No open pull requests found."
           }
         }
       },
