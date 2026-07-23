@@ -100,7 +100,7 @@ describe('getWorkspaceIntentName', () => {
     })
   })
 
-  it('defaults PR and MR work to review-oriented identities', () => {
+  it('keeps explicit review and fix intents for PR and MR work', () => {
     expect(
       getWorkspaceIntentName({
         sourceText: 'https://github.com/acme/app/pull/1234 and check whether this is safe',
@@ -127,6 +127,35 @@ describe('getWorkspaceIntentName', () => {
     ).toEqual({
       displayName: 'MR 77 - Fix',
       seedName: 'mr-77-fix'
+    })
+  })
+
+  it('names PR work from the number and title subject when no intent is expressed', () => {
+    // Batch PR launches pass no sourceText at all.
+    expect(
+      getWorkspaceIntentName({
+        workItem: {
+          type: 'pr',
+          number: 8761,
+          title: 'feat(status-bar): consolidate agent usage into a single roster popover'
+        }
+      })
+    ).toEqual({
+      displayName: 'PR 8761 Consolidate Agent Usage',
+      seedName: 'pr-8761-consolidate-agent-usage'
+    })
+    expect(
+      getWorkspaceIntentName({
+        sourceText: 'https://github.com/acme/app/pull/1234',
+        workItem: {
+          type: 'pr',
+          number: 1234,
+          title: 'Agent roster popover'
+        }
+      })
+    ).toEqual({
+      displayName: 'PR 1234 Agent Roster Popover',
+      seedName: 'pr-1234-agent-roster-popover'
     })
   })
 

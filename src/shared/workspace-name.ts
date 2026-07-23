@@ -193,10 +193,6 @@ export function getLinkedWorkItemWorkspaceName(
   return { displayName, seedName }
 }
 
-function defaultActionForWorkItem(item: WorkspaceIntentWorkItem): string | null {
-  return item.type === 'pr' || item.type === 'mr' ? 'Review' : null
-}
-
 /**
  * Resolve the one human intent label that should drive first-create workspace
  * identity. The display label and git-safe seed are derived together so the
@@ -212,7 +208,8 @@ export function getWorkspaceIntentName(args: {
   let displayName = ''
 
   if (item) {
-    const action = detectIntentAction(sourceText) ?? defaultActionForWorkItem(item)
+    // Why: no default "Review" action — it named every PR worktree "PR N - Review", indistinguishable in a batch.
+    const action = detectIntentAction(sourceText)
     const identity = workItemIdentity(item)
     if (action) {
       // Identifier-first so the sidebar leads with the searchable token

@@ -77,11 +77,11 @@ vi.mock('@/lib/new-workspace', () => ({
       ? {
           displayName:
             args.workItem.type === 'pr'
-              ? `PR ${args.workItem.number} - Review`
+              ? `PR ${args.workItem.number} ${args.workItem.title}`
               : `Issue ${args.workItem.number}`,
           seedName:
             args.workItem.type === 'pr'
-              ? `pr-${args.workItem.number}-review`
+              ? `pr-${args.workItem.number}-${args.workItem.title.toLowerCase().replace(/\s+/g, '-')}`
               : `issue-${args.workItem.number}`
         }
       : null,
@@ -223,7 +223,7 @@ describe('launchWorkItemDirect', () => {
     )
   })
 
-  it('passes a resolved PR branch override while using a short PR identity for workspace names', async () => {
+  it('passes a resolved PR branch override while naming the workspace from the PR number and title', async () => {
     mocks.ensureDetectedAgents.mockResolvedValue([])
     mocks.store.settings = {}
     const { launchWorkItemDirect } = await import('./launch-work-item-direct')
@@ -253,12 +253,12 @@ describe('launchWorkItemDirect', () => {
     })
     expect(mocks.createWorktree).toHaveBeenCalledWith(
       'repo-1',
-      'pr-6934-review',
+      'pr-6934-fix-the-bug',
       'abc123',
       'inherit',
       undefined,
       'sidebar',
-      'PR 6934 - Review',
+      'PR 6934 Fix the bug',
       undefined,
       6934,
       { remoteName: 'origin', branchName: 'feature/fix' },
