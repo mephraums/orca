@@ -53,11 +53,9 @@ const winSpeechNativeResource = {
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: 'com.stablyai.orca',
-  // Why (personal fork): rename the app so this build is distinguishable from the released
-  // Orca in Finder/Dock. appId deliberately unchanged — it's hardcoded in notifications.ts,
-  // dev-instance-identity.ts and the macOS helper build scripts, and desyncing it breaks
-  // notification delivery/permission deep-links.
-  productName: 'Orca Fork',
+  // Why (personal fork): keep the upstream name — the amber icon marks the fork, and a stable
+  // /Applications/Orca.app path keeps the registered CLI shim valid across builds.
+  productName: 'Orca',
   directories: {
     buildResources: 'resources/build'
   },
