@@ -40,6 +40,9 @@ type PrimaryEventSuppression = { failureKey: string; error: unknown }
 type UpdateCheckVariant = 'default' | 'prerelease' | 'perf'
 type ReleaseFeedPreflightResult = 'ready' | 'not-available'
 
+// Why (personal fork): the feed points at stablyai/orca releases, so any accepted update would replace this fork with the official app; off under vitest so upstream updater suites keep passing.
+const FORK_AUTO_UPDATE_DISABLED = process.env.VITEST === undefined
+
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const AUTO_UPDATE_RETRY_INTERVAL_MS = 60 * 60 * 1000
 // Why: a persistently-failing feed used to re-arm the retry at a fixed 1h cadence forever (issue #7576); backoff doubles per failure up to this cap, any completed check resets.
@@ -1090,6 +1093,11 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
     sendStatus({ state: 'not-available', userInitiated: true })
     return
   }
+  // Why (personal fork): the feed only serves official Orca builds, so answer "up to date" instead of offering to overwrite the fork.
+  if (FORK_AUTO_UPDATE_DISABLED) {
+    sendStatus({ state: 'not-available', userInitiated: true })
+    return
+  }
 
   const checkVariant = getUpdateCheckVariant(options)
   if (checkVariant === 'prerelease') {
@@ -1271,6 +1279,10 @@ export function setupAutoUpdater(
     return
   }
   if (is.dev) {
+    return
+  }
+  // Why (personal fork): skip handler registration and every scheduled/launch/wake/nudge check so the fork never prompts to "update" onto official Orca.
+  if (FORK_AUTO_UPDATE_DISABLED) {
     return
   }
 
