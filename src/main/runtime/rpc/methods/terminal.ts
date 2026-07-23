@@ -38,6 +38,10 @@ import {
   MOBILE_SUBSCRIBE_SCROLLBACK_ROWS
 } from '../../scrollback-limits'
 import { assertTerminalAgentSendable } from '../terminal-agent-send-guard'
+import {
+  navigationTargetsHost,
+  resolveRuntimeNavigationTarget
+} from '../../../../shared/runtime-navigation'
 
 const REQUESTED_SNAPSHOT_BYTE_BUDGET = 2 * 1024 * 1024
 const TERMINAL_STREAM_CHUNK_BYTES = 48 * 1024
@@ -820,6 +824,10 @@ const TerminalHandle = z.object({
   terminal: requiredString('Missing terminal handle')
 })
 
+const TerminalFocus = TerminalHandle.extend({
+  navigation: z.enum(['caller', 'host']).optional()
+})
+
 const TerminalListParams = z.object({
   worktree: OptionalString,
   limit: OptionalFiniteNumber,
@@ -831,7 +839,14 @@ const TerminalResolveActive = z.object({
 })
 
 const TerminalResolvePane = z.object({
-  paneKey: requiredString('Missing pane key')
+  paneKey: requiredString('Missing pane key'),
+  worktreeId: OptionalString
+})
+
+const TerminalRecoverPane = z.object({
+  paneKey: requiredString('Missing pane key'),
+  worktreeId: requiredString('Missing worktree ID'),
+  expectedTerminal: requiredString('Missing expected terminal handle').optional()
 })
 
 const TerminalRead = TerminalHandle.extend({
@@ -902,6 +917,8 @@ const TerminalWait = TerminalHandle.extend({
 
 const TerminalCreateParams = z.object({
   worktree: OptionalString,
+  clientMutationId: z.string().min(1).max(128).optional(),
+  reconcileExisting: z.boolean().optional(),
   command: OptionalString,
   startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
   env: z.record(z.string(), z.string()).optional(),
@@ -913,8 +930,21 @@ const TerminalCreateParams = z.object({
       agentEnv: z.record(z.string(), z.string())
     })
     .optional(),
+  resumeProviderSession: z
+    .object({
+      key: z.enum(['session_id', 'conversation_id']),
+      id: z.string().min(1).max(512),
+      transcriptPath: z.string().min(1).max(32_768).optional()
+    })
+    .optional(),
   launchToken: OptionalString,
   launchAgent: z.string().refine(isTuiAgent).optional(),
+  terminalColorQueryReplies: z
+    .object({
+      foreground: z.string().max(128).optional(),
+      background: z.string().max(128).optional()
+    })
+    .optional(),
   title: OptionalString,
   focus: z.unknown().optional(),
   rendererBacked: z.unknown().optional(),
@@ -938,6 +968,8 @@ const TerminalSplit = TerminalHandle.extend({
 const TerminalStop = z.object({
   worktree: requiredString('Missing worktree selector')
 })
+
+const TerminalSleep = TerminalStop
 
 const TerminalStopExact = TerminalStop.extend({
   expectedPtyIds: z.array(requiredString('Missing PTY ID')).min(1),
@@ -1085,7 +1117,18 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     name: 'terminal.resolvePane',
     params: TerminalResolvePane,
     handler: async (params, { runtime }) => ({
-      terminal: runtime.resolveTerminalPane(params.paneKey)
+      terminal: runtime.resolveTerminalPane(params.paneKey, params.worktreeId)
+    })
+  }),
+  defineMethod({
+    name: 'terminal.recoverPane',
+    params: TerminalRecoverPane,
+    handler: async (params, { runtime }) => ({
+      terminal: await runtime.recoverTerminalPane(
+        params.paneKey,
+        params.worktreeId,
+        params.expectedTerminal
+      )
     })
   }),
   defineMethod({
@@ -1341,23 +1384,37 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'terminal.create',
     params: TerminalCreateParams,
-    handler: async (params, { runtime }) => ({
-      terminal: await runtime.createTerminal(params.worktree, {
-        command: params.command,
-        startupCommandDelivery: params.startupCommandDelivery,
-        env: params.env,
-        envToDelete: params.envToDelete,
-        ...(params.launchConfig ? { launchConfig: params.launchConfig } : {}),
-        ...(params.launchToken ? { launchToken: params.launchToken } : {}),
-        ...(params.launchAgent ? { launchAgent: params.launchAgent } : {}),
-        title: params.title,
-        focus: params.focus === true,
-        rendererBacked: params.rendererBacked === true,
-        activate: params.activate === true,
-        presentation: params.presentation,
-        tabId: params.tabId,
-        leafId: params.leafId
-      })
+    handler: async (params, { runtime, pairedDeviceId, clientId }) => ({
+      terminal: await runtime.dedupeTerminalCreate(
+        pairedDeviceId ?? clientId ?? 'local',
+        params.worktree,
+        params.clientMutationId,
+        params.reconcileExisting === true,
+        (canonicalWorktreeSelector, preAllocatedHandle) =>
+          runtime.createTerminal(canonicalWorktreeSelector, {
+            command: params.command,
+            startupCommandDelivery: params.startupCommandDelivery,
+            env: params.env,
+            envToDelete: params.envToDelete,
+            ...(params.launchConfig ? { launchConfig: params.launchConfig } : {}),
+            ...(params.resumeProviderSession
+              ? { resumeProviderSession: params.resumeProviderSession }
+              : {}),
+            ...(params.launchToken ? { launchToken: params.launchToken } : {}),
+            ...(params.launchAgent ? { launchAgent: params.launchAgent } : {}),
+            ...(params.terminalColorQueryReplies
+              ? { terminalColorQueryReplies: params.terminalColorQueryReplies }
+              : {}),
+            title: params.title,
+            focus: params.focus === true,
+            rendererBacked: params.rendererBacked === true,
+            activate: params.activate === true,
+            presentation: params.presentation,
+            tabId: params.tabId,
+            leafId: params.leafId,
+            ...(preAllocatedHandle ? { preAllocatedHandle } : {})
+          })
+      )
     })
   }),
   defineMethod({
@@ -1376,6 +1433,11 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     name: 'terminal.stop',
     params: TerminalStop,
     handler: async (params, { runtime }) => runtime.stopTerminalsForWorktree(params.worktree)
+  }),
+  defineMethod({
+    name: 'terminal.sleep',
+    params: TerminalSleep,
+    handler: async (params, { runtime }) => runtime.sleepTerminalsForWorktree(params.worktree)
   }),
   defineMethod({
     name: 'terminal.stopExact',
@@ -1412,9 +1474,13 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
   }),
   defineMethod({
     name: 'terminal.focus',
-    params: TerminalHandle,
-    handler: async (params, { runtime }) => ({
-      focus: await runtime.focusTerminal(params.terminal)
+    params: TerminalFocus,
+    handler: async (params, { runtime, clientKind }) => ({
+      focus: await runtime.focusTerminal(params.terminal, {
+        navigateHost: navigationTargetsHost(
+          resolveRuntimeNavigationTarget({ navigation: params.navigation, clientKind })
+        )
+      })
     })
   }),
   defineMethod({
@@ -1920,6 +1986,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         stream.pendingOutputOverflowed = false
         stream.buffering = true
         const requestId = request.requestId
+        let sentSnapshotOutputSeq: number | undefined
         try {
           const scrollbackRows = normalizeMultiplexSnapshotScrollbackRows(request.scrollbackRows)
           let serialized = await serializeBudgetedRequestedSnapshot(
@@ -1961,6 +2028,7 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
               return
             }
           }
+          sentSnapshotOutputSeq = serialized?.seq
           sendSnapshotFrames((opcode, payload) => sendFrame(stream.streamId, opcode, payload), {
             kind: 'scrollback',
             cols: serialized?.cols ?? size?.cols ?? 80,
@@ -1988,7 +2056,17 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
             const pendingOutput = stream.pendingOutput.splice(0)
             if (shouldFlushPendingOutput) {
               for (const chunk of pendingOutput) {
-                stream.outputBatcher.push(chunk.data, chunk.meta)
+                // Why: an untagged reply resets the client to the snapshot's
+                // high-water, so covered bytes would render twice; tagged
+                // snapshots feed a side consumer and the live view still
+                // needs every buffered chunk.
+                const uncoveredData =
+                  typeof requestId === 'number'
+                    ? chunk.data
+                    : getOutputAfterSnapshotSeq(chunk, sentSnapshotOutputSeq)
+                if (uncoveredData) {
+                  stream.outputBatcher.push(uncoveredData, chunk.meta)
+                }
               }
             }
             stream.pendingOutputBytes = 0
@@ -2492,7 +2570,8 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           .then(() => runtime.cleanupSubscription(subscriptionId))
           .catch(() => runtime.cleanupSubscription(subscriptionId))
         try {
-          await runtime.handleMobileSubscribe(ptyId, clientId, params.viewport)
+          // Why: a lease-only subscriber has no terminal view, so its cached viewport must never phone-fit the PTY.
+          await runtime.handleMobileSubscribe(ptyId, clientId, undefined)
           if (closed || signal?.aborted) {
             // Why: a disconnect can win the awaited subscribe and resurrect mobile presence after cleanup already released it.
             runtime.handleMobileUnsubscribe(ptyId, clientId)
