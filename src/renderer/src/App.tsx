@@ -89,6 +89,7 @@ import { ConfirmationDialogProvider } from './components/confirmation-dialog'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
 import RecentTabSwitcher from './components/tab-bar/RecentTabSwitcher'
 import { useGitStatusPolling } from './components/right-sidebar/useGitStatusPolling'
+import { useBackgroundGitFetch } from './hooks/useBackgroundGitFetch'
 import { useEditorExternalWatch } from './hooks/useEditorExternalWatch'
 import { useAutoAckViewedAgent } from './hooks/useAutoAckViewedAgent'
 import { useDashboardPopoutBridge } from './components/dashboard/useDashboardPopoutBridge'
@@ -716,6 +717,9 @@ function App(): React.JSX.Element {
   // Why: retention runs at App level (in <RetainedAgentsSyncGate />, a null leaf) so "done" agents survive card collapse and its high-churn subscriptions don't re-render App.
   // Why: git polling lives at App level (RightSidebar unmounts when closed, stranding stale Rebasing/Merging badges); gate on workspaceSessionReady so it doesn't compete with first paint.
   useGitStatusPolling({ enabled: workspaceSessionReady })
+  // Why: useGitStatusPolling only covers the active workspace; sidebar ahead/behind
+  // badges need every repo fetched, or "behind" silently reads 0 forever.
+  useBackgroundGitFetch()
   // Why: wire file-change watching at App level so the editor keeps hearing FS changes when Explorer unmounts (right-sidebar switches to Source Control/Checks).
   useEditorExternalWatch()
   useGlobalFileDrop()

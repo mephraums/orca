@@ -9,6 +9,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { matchesSettingsSearch } from './settings-search'
 import { AutoRenameBranchFromWorkSetting } from './AutoRenameBranchFromWorkSetting'
 import { PrWorkspacePromptSetting } from './PrWorkspacePromptSetting'
+import { BackgroundGitFetchSetting } from './BackgroundGitFetchSetting'
 import {
   CompareAgainstUpstreamSetting,
   compareAgainstUpstreamMatchesSearch
@@ -314,6 +315,11 @@ export function GitPane({
     ) : null,
     <PrWorkspacePromptSetting
       key="pr-workspace-prompt"
+      settings={settings}
+      updateSettings={updateSettings}
+    />,
+    <BackgroundGitFetchSetting
+      key="background-git-fetch"
       settings={settings}
       updateSettings={updateSettings}
     />,

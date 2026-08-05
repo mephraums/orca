@@ -9404,6 +9404,14 @@
           "preview": "Preview:",
           "overridden": "Overriding the global template for this project.",
           "inherited": "Leave blank to inherit the global template from Settings."
+        },
+        "BackgroundGitFetchSetting": {
+          "title": "Background fetch",
+          "description": "Periodically fetch so workspace ahead/behind counts stay accurate.",
+          "help": "Without this, behind counts read zero even when the remote has moved. Runs only while the window is focused, and skips disconnected SSH hosts.",
+          "every": "Every",
+          "oneMinute": "1 minute",
+          "manyMinutes": "minutes"
         }
       },
       "right": {

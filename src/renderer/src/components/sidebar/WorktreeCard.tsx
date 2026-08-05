@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: the worktree card centralizes sidebar card state (selection, drag, agent status, git info, context menu) in one cohesive component so sidebar rendering doesn't fan out across files. */
-import React, { useEffect, useCallback, useState } from 'react'
+import React, { useEffect, useCallback, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review'
 import { issueCacheKey as getIssueCacheKey } from '@/store/slices/github'
@@ -73,6 +73,8 @@ import {
   useWorkspaceDeleteModifierPressed
 } from './workspace-delete-quick-action'
 import { DetachedHeadBadge } from '@/components/DetachedHeadBadge'
+import { WorkspaceSyncBadge } from './WorkspaceSyncBadge'
+import { getWorkspaceSyncIndicator } from '../../../../shared/workspace-sync-indicator'
 import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-display'
 import {
   getFlushWorktreeCardPaddingLeft,
@@ -397,6 +399,9 @@ const WorktreeCard = React.memo(function WorktreeCard({
       : ''
   )
 
+  // Why: optional index — the card must render even before the upstream slice hydrates.
+  const upstreamStatus = useAppStore((s) => s.remoteStatusesByWorktree?.[worktree.id])
+  const syncIndicator = useMemo(() => getWorkspaceSyncIndicator(upstreamStatus), [upstreamStatus])
   const gitIdentityDisplay = getWorktreeGitIdentityDisplay(worktree)
   const detachedHeadDisplay = gitIdentityDisplay?.kind === 'detached' ? gitIdentityDisplay : null
   const branch = gitIdentityDisplay?.kind === 'branch' ? gitIdentityDisplay.branchName : ''
@@ -1679,6 +1684,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
                   className="h-[16px]"
                 />
               ) : null}
+
+              {syncIndicator && <WorkspaceSyncBadge indicator={syncIndicator} />}
 
               {showConflictOperationBadge && (
                 <Badge

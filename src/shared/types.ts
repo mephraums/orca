@@ -35,6 +35,7 @@ import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { UiLanguage } from './ui-language'
 import type { ForkSyncMode } from './git-fork-sync'
+import type { BackgroundGitFetchSettings } from './background-git-fetch-schedule'
 import type { GitRemoteIdentity } from './git-remote-identity'
 import type {
   GlobalWindowsRuntimeDefault,
@@ -2939,6 +2940,9 @@ export type GlobalSettings = {
   /** Prompt prefilled when a workspace launches from a PR/MR. Undefined uses the
    *  built-in `/review {{pr_number}}`; blank restores the bare-URL prefill. */
   prWorkspacePromptTemplate?: string
+  /** Periodic `git fetch` that keeps sidebar ahead/behind counts truthful.
+   *  Undefined uses the default (enabled, every 5 minutes). */
+  backgroundGitFetch?: BackgroundGitFetchSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
   /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.

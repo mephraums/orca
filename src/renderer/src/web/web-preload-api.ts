@@ -1890,6 +1890,26 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         pushTarget
       })
     },
+    branchReturnState: async ({ worktreePath }) => {
+      const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+      return callRuntimeResult('git.branchReturnState', {
+        worktree: toRuntimeWorktreeSelector(worktree.id)
+      })
+    },
+    checkoutBranch: async ({ worktreePath, branch }) => {
+      const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+      await callRuntimeResult('git.checkout', {
+        worktree: toRuntimeWorktreeSelector(worktree.id),
+        branch
+      })
+    },
+    deleteBranch: async ({ worktreePath, branch }) => {
+      const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+      await callRuntimeResult('git.deleteBranch', {
+        worktree: toRuntimeWorktreeSelector(worktree.id),
+        branch
+      })
+    },
     syncFork: async ({ worktreePath, expectedUpstream }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
       return callRuntimeResult(
