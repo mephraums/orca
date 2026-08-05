@@ -158,6 +158,17 @@ export const GIT_METHODS: RpcMethod[] = [
     handler: async (params, { runtime }) => runtime.listRuntimeGitLocalBranches(params.worktree)
   }),
   defineMethod({
+    name: 'git.branchReturnState',
+    params: WorktreeSelector,
+    handler: async (params, { runtime }) => runtime.getRuntimeGitBranchReturnState(params.worktree)
+  }),
+  defineMethod({
+    name: 'git.deleteBranch',
+    params: GitCheckout,
+    handler: async (params, { runtime }) =>
+      runtime.deleteRuntimeGitBranch(params.worktree, params.branch)
+  }),
+  defineMethod({
     name: 'git.diff',
     params: GitDiff,
     handler: async (params, { runtime }) =>

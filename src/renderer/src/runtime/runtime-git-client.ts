@@ -18,6 +18,7 @@ import type {
   CommitMessageAgentCapability,
   CommitMessageModelCapability
 } from '../../../shared/commit-message-agent-spec'
+import type { BranchReturnState } from '../../../shared/branch-return-state'
 import type { HostedReviewProvider } from '../../../shared/hosted-review'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../shared/source-control-ai'
 import { getCommitMessageModelDiscoveryHostKeyForScope } from '../../../shared/commit-message-host-key'
@@ -419,6 +420,66 @@ export async function getRuntimeGitUpstreamStatus(
       ...(pushTarget ? { pushTarget } : {})
     },
     { timeoutMs: 15_000 }
+  )
+}
+
+export async function getRuntimeGitBranchReturnState(
+  context: RuntimeGitContext
+): Promise<BranchReturnState> {
+  const target = getActiveRuntimeTarget(context.settings)
+  if (target.kind === 'local' || !context.worktreeId) {
+    return window.api.git.branchReturnState({
+      worktreePath: resolveLocalWorktreePath(context),
+      connectionId: context.connectionId
+    })
+  }
+  return callRuntimeRpc<BranchReturnState>(
+    target,
+    'git.branchReturnState',
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId) },
+    { timeoutMs: 15_000 }
+  )
+}
+
+export async function checkoutRuntimeGitBranch(
+  context: RuntimeGitContext,
+  branch: string
+): Promise<void> {
+  const target = getActiveRuntimeTarget(context.settings)
+  if (target.kind === 'local' || !context.worktreeId) {
+    await window.api.git.checkoutBranch({
+      worktreePath: resolveLocalWorktreePath(context),
+      branch,
+      connectionId: context.connectionId
+    })
+    return
+  }
+  await callRuntimeRpc(
+    target,
+    'git.checkout',
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId), branch },
+    { timeoutMs: 30_000 }
+  )
+}
+
+export async function deleteRuntimeGitBranch(
+  context: RuntimeGitContext,
+  branch: string
+): Promise<void> {
+  const target = getActiveRuntimeTarget(context.settings)
+  if (target.kind === 'local' || !context.worktreeId) {
+    await window.api.git.deleteBranch({
+      worktreePath: resolveLocalWorktreePath(context),
+      branch,
+      connectionId: context.connectionId
+    })
+    return
+  }
+  await callRuntimeRpc(
+    target,
+    'git.deleteBranch',
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId), branch },
+    { timeoutMs: 30_000 }
   )
 }
 

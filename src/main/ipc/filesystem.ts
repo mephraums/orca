@@ -39,6 +39,10 @@ import {
   ingestRgJsonLine,
   SEARCH_TIMEOUT_MS
 } from '../../shared/text-search'
+import { assertValidBranchName, checkoutBranch, deleteLocalBranch } from '../git/checkout'
+import { gitOptionsForWorktree } from '../git/git-runtime-options'
+import { getBranchReturnStateViaExec } from '../git/branch-return-state'
+import type { BranchReturnState } from '../../shared/branch-return-state'
 import {
   getStatus,
   getSubmoduleStatus,
@@ -1249,6 +1253,80 @@ export function registerFilesystemHandlers(
       }
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
       return detectConflictOperation(worktreePath)
+    }
+  )
+
+  ipcMain.handle(
+    'git:branchReturnState',
+    async (
+      _event,
+      args: { worktreePath: string; connectionId?: string }
+    ): Promise<BranchReturnState> => {
+      if (args.connectionId) {
+        const provider = getSshGitProvider(args.connectionId)
+        if (!provider) {
+          throw new Error(`No git provider for connection "${args.connectionId}"`)
+        }
+        return getBranchReturnStateViaExec((argv) => provider.exec(argv, args.worktreePath))
+      }
+      const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
+        store,
+        args.worktreePath,
+        worktreePath
+      )
+      return getBranchReturnStateViaExec((argv) =>
+        gitExecFileAsync(argv, gitOptionsForWorktree(worktreePath, gitOptions))
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'git:checkoutBranch',
+    async (
+      _event,
+      args: { worktreePath: string; branch: string; connectionId?: string }
+    ): Promise<void> => {
+      if (args.connectionId) {
+        const provider = getSshGitProvider(args.connectionId)
+        if (!provider) {
+          throw new Error(`No git provider for connection "${args.connectionId}"`)
+        }
+        return provider.checkoutBranch(args.worktreePath, args.branch)
+      }
+      const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
+        store,
+        args.worktreePath,
+        worktreePath
+      )
+      await checkoutBranch(worktreePath, args.branch, gitOptions)
+    }
+  )
+
+  ipcMain.handle(
+    'git:deleteBranch',
+    async (
+      _event,
+      args: { worktreePath: string; branch: string; connectionId?: string }
+    ): Promise<void> => {
+      if (args.connectionId) {
+        const provider = getSshGitProvider(args.connectionId)
+        if (!provider) {
+          throw new Error(`No git provider for connection "${args.connectionId}"`)
+        }
+        // Why: `-d` refuses unmerged branches, matching the local path's safety.
+        assertValidBranchName(args.branch)
+        await provider.exec(['branch', '-d', args.branch], args.worktreePath)
+        return
+      }
+      const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
+        store,
+        args.worktreePath,
+        worktreePath
+      )
+      await deleteLocalBranch(worktreePath, args.branch, gitOptions)
     }
   )
 

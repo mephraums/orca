@@ -25,12 +25,21 @@ import {
   PinOff,
   Kanban,
   Trash2,
+  Undo2,
   Unlink,
   Workflow,
   FolderInput,
   FolderPlus,
   FolderTree
 } from 'lucide-react'
+import { toast } from 'sonner'
+import { checkoutRuntimeGitBranch, deleteRuntimeGitBranch } from '@/runtime/runtime-git-client'
+import { usePrimaryWorkspaceBranchState } from './use-primary-workspace-branch-state'
+import {
+  describeDeleteBranchAndReturn,
+  describeReturnToDefault,
+  resolvePrimaryWorkspaceBranchActions
+} from './primary-workspace-branch-actions'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { useAllWorktrees, useRepoById, useRepoMap, useWorktreeMap } from '@/store/selectors'
@@ -384,6 +393,86 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     [activeContextWorktrees, repoMap]
   )
   const removesProject = shouldRemoveProjectFromContextMenu(repo, worktree)
+  const runtimeGitSettings = useAppStore((s) => s.settings)
+  const { state: primaryBranchState, reload: reloadPrimaryBranchState } =
+    usePrimaryWorkspaceBranchState({
+      enabled: menuOpen && !isMultiContext && Boolean(worktree.isMainWorktree),
+      worktreeId: worktree.id,
+      worktreePath: worktree.path,
+      connectionId: repo?.connectionId ?? null
+    })
+  const primaryBranchActions = useMemo(
+    () => resolvePrimaryWorkspaceBranchActions(primaryBranchState),
+    [primaryBranchState]
+  )
+  const showPrimaryBranchActions =
+    !isMultiContext && Boolean(worktree.isMainWorktree) && primaryBranchActions.visible
+  const runtimeGitContext = useMemo(
+    () => ({
+      settings: runtimeGitSettings,
+      worktreeId: worktree.id,
+      worktreePath: worktree.path,
+      ...(repo?.connectionId ? { connectionId: repo.connectionId } : {})
+    }),
+    [runtimeGitSettings, worktree.id, worktree.path, repo?.connectionId]
+  )
+  const handleReturnToDefaultBranch = useCallback(() => {
+    const branch = primaryBranchState?.defaultBranch
+    if (!branch) {
+      return
+    }
+    void checkoutRuntimeGitBranch(runtimeGitContext, branch)
+      .then(() => {
+        toast.success(
+          translate('auto.components.sidebar.WorktreeContextMenu.switchedToBranch', 'Switched to', {
+            branch
+          })
+        )
+        reloadPrimaryBranchState()
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.sidebar.WorktreeContextMenu.switchBranchFailed',
+                'Could not switch branch',
+                { branch }
+              )
+        )
+      })
+  }, [primaryBranchState?.defaultBranch, runtimeGitContext, reloadPrimaryBranchState])
+  const handleDeleteBranchAndReturn = useCallback(() => {
+    const branch = primaryBranchState?.currentBranch
+    const defaultBranch = primaryBranchState?.defaultBranch
+    if (!branch || !defaultBranch) {
+      return
+    }
+    // Why: git refuses to delete the branch that is checked out, so switch first.
+    void checkoutRuntimeGitBranch(runtimeGitContext, defaultBranch)
+      .then(() => deleteRuntimeGitBranch(runtimeGitContext, branch))
+      .then(() => {
+        toast.success(
+          translate(
+            'auto.components.sidebar.WorktreeContextMenu.deletedBranchAndSwitched',
+            'Deleted branch and switched back',
+            { branch, defaultBranch }
+          )
+        )
+        reloadPrimaryBranchState()
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.sidebar.WorktreeContextMenu.deleteBranchFailed',
+                'Could not delete branch',
+                { branch }
+              )
+        )
+      })
+  }, [primaryBranchState, runtimeGitContext, reloadPrimaryBranchState])
   const sleepLabel =
     isMultiContext && sleepableWorktrees.length > 0
       ? `Sleep ${sleepableWorktrees.length} Workspace${sleepableWorktrees.length === 1 ? '' : 's'}`
@@ -902,35 +991,60 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                   )}
             </TooltipContent>
           </Tooltip>
-          {/* Why: primary checkout rows can't be git-worktree-removed, so keep a
-             disabled Delete Worktree for parity with non-primary cards and pair
-             it with the enabled Remove Project action below. */}
-          {!isMultiContext && removesProject ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <DropdownMenuItem variant="destructive" disabled>
-                    <Trash2 className="size-3.5" />
-                    {translate(
-                      'auto.components.sidebar.WorktreeContextMenu.deleteWorktree',
-                      'Delete Worktree'
-                    )}
-                  </DropdownMenuItem>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={8} className="max-w-[200px] text-pretty">
-                {translate(
-                  'auto.components.sidebar.WorktreeContextMenu.primaryDeleteDisabled',
-                  "Primary worktree — can't be deleted. Remove the project instead."
-                )}
-              </TooltipContent>
-            </Tooltip>
+          {/* Why: the primary checkout can't be git-worktree-removed, so its
+             destructive slot offers branch cleanup instead — an agent that opened
+             and landed a PR leaves it parked on a merged branch. Remove Project
+             stays on the project header menu. */}
+          {showPrimaryBranchActions ? (
+            <>
+              <DropdownMenuSeparator />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <DropdownMenuItem
+                      onSelect={handleReturnToDefaultBranch}
+                      disabled={!primaryBranchActions.returnToDefault.enabled}
+                    >
+                      <Undo2 className="size-3.5" />
+                      {describeReturnToDefault(primaryBranchState)}
+                    </DropdownMenuItem>
+                  </div>
+                </TooltipTrigger>
+                {primaryBranchActions.returnToDefault.disabledReason ? (
+                  <TooltipContent side="right" sideOffset={8} className="max-w-[220px] text-pretty">
+                    {primaryBranchActions.returnToDefault.disabledReason}
+                  </TooltipContent>
+                ) : null}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={handleDeleteBranchAndReturn}
+                      disabled={!primaryBranchActions.deleteBranchAndReturn.enabled}
+                    >
+                      <Trash2 className="size-3.5" />
+                      {describeDeleteBranchAndReturn(primaryBranchState)}
+                    </DropdownMenuItem>
+                  </div>
+                </TooltipTrigger>
+                {primaryBranchActions.deleteBranchAndReturn.disabledReason ? (
+                  <TooltipContent side="right" sideOffset={8} className="max-w-[220px] text-pretty">
+                    {primaryBranchActions.deleteBranchAndReturn.disabledReason}
+                  </TooltipContent>
+                ) : null}
+              </Tooltip>
+            </>
           ) : null}
           {/* Why: primary checkout rows remove the project from Orca instead of
              invoking git worktree deletion. Radix forwards unknown props to the
              DOM element, so `title` works directly without a wrapper span —
              this preserves Radix's flat roving-tabindex keyboard navigation. */}
           <DropdownMenuItem
+            // Why: the primary row's destructive slot is branch cleanup now;
+            // Remove Project lives on the project header menu instead.
+            hidden={!isMultiContext && removesProject}
             variant="destructive"
             onSelect={handleDelete}
             disabled={

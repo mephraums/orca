@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type { BranchReturnState } from '../shared/branch-return-state'
 import type { DashboardSnapshot, DashboardRevealAgentArgs } from '../shared/dashboard-snapshot'
 import type {
   TerminalPreviewConnectResult,
@@ -3038,6 +3039,20 @@ const api = {
     ): Promise<GitHistoryResult> => ipcRenderer.invoke('git:history', args),
     conflictOperation: (args: { worktreePath: string; connectionId?: string }): Promise<unknown> =>
       ipcRenderer.invoke('git:conflictOperation', args),
+    branchReturnState: (args: {
+      worktreePath: string
+      connectionId?: string
+    }): Promise<BranchReturnState> => ipcRenderer.invoke('git:branchReturnState', args),
+    checkoutBranch: (args: {
+      worktreePath: string
+      branch: string
+      connectionId?: string
+    }): Promise<void> => ipcRenderer.invoke('git:checkoutBranch', args),
+    deleteBranch: (args: {
+      worktreePath: string
+      branch: string
+      connectionId?: string
+    }): Promise<void> => ipcRenderer.invoke('git:deleteBranch', args),
     abortMerge: (args: { worktreePath: string; connectionId?: string }): Promise<void> =>
       ipcRenderer.invoke('git:abortMerge', args),
     abortRebase: (args: { worktreePath: string; connectionId?: string }): Promise<void> =>

@@ -26,6 +26,7 @@ import type {
 } from '../shared/local-log-tail-types'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type { AppIdentity } from '../shared/app-identity'
+import type { BranchReturnState } from '../shared/branch-return-state'
 import type {
   WriteTerminalRenderDesyncEvidenceArgs,
   WriteTerminalRenderDesyncEvidenceResult
@@ -2650,6 +2651,20 @@ export type PreloadApi = {
       worktreePath: string
       connectionId?: string
     }) => Promise<GitConflictOperation>
+    branchReturnState: (args: {
+      worktreePath: string
+      connectionId?: string
+    }) => Promise<BranchReturnState>
+    checkoutBranch: (args: {
+      worktreePath: string
+      branch: string
+      connectionId?: string
+    }) => Promise<void>
+    deleteBranch: (args: {
+      worktreePath: string
+      branch: string
+      connectionId?: string
+    }) => Promise<void>
     abortMerge: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     abortRebase: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     diff: (args: {

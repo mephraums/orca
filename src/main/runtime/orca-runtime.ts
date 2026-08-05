@@ -7016,6 +7016,10 @@ export class OrcaRuntimeService {
     this.gitCommands.getRuntimeGitCommitCompare.bind(this.gitCommands)
   getRuntimeGitUpstreamStatus: RuntimeGitCommands['getRuntimeGitUpstreamStatus'] =
     this.gitCommands.getRuntimeGitUpstreamStatus.bind(this.gitCommands)
+  getRuntimeGitBranchReturnState: RuntimeGitCommands['getRuntimeGitBranchReturnState'] =
+    this.gitCommands.getRuntimeGitBranchReturnState.bind(this.gitCommands)
+  deleteRuntimeGitBranch: RuntimeGitCommands['deleteRuntimeGitBranch'] =
+    this.gitCommands.deleteRuntimeGitBranch.bind(this.gitCommands)
   fetchRuntimeGit: RuntimeGitCommands['fetchRuntimeGit'] = this.gitCommands.fetchRuntimeGit.bind(
     this.gitCommands
   )

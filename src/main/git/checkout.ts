@@ -34,6 +34,22 @@ export async function checkoutBranch(
 }
 
 /**
+ * Delete a local branch. Uses `-d`, so git refuses when the branch still holds
+ * unmerged commits — the caller gates on that, and this is the second line of
+ * defense rather than a force delete.
+ */
+export async function deleteLocalBranch(
+  worktreePath: string,
+  branch: string,
+  options: GitRuntimeOptions = {}
+): Promise<void> {
+  assertValidBranchName(branch)
+  await runWithGitReadCacheInvalidation(() =>
+    gitExecFileAsync(['branch', '-d', branch], gitOptionsForWorktree(worktreePath, options))
+  )
+}
+
+/**
  * List local branch short-names for the branch picker, current branch first.
  * Uses `for-each-ref` (stable, scriptable output) instead of `branch` to avoid
  * locale-dependent decoration.

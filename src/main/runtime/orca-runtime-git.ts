@@ -46,7 +46,14 @@ import {
   stageFile,
   unstageFile
 } from '../git/status'
-import { checkoutBranch, listLocalBranches } from '../git/checkout'
+import {
+  assertValidBranchName,
+  checkoutBranch,
+  deleteLocalBranch,
+  listLocalBranches
+} from '../git/checkout'
+import { getBranchReturnStateViaExec } from '../git/branch-return-state'
+import type { BranchReturnState } from '../../shared/branch-return-state'
 import type { RuntimeGitCheckoutResult, RuntimeGitLocalBranches } from '../../shared/runtime-types'
 import { getHistory as getGitHistory } from '../git/history'
 import { getUpstreamStatus } from '../git/upstream'
@@ -373,6 +380,41 @@ export class RuntimeGitCommands {
       return provider.getUpstreamStatus(target.worktree.path, pushTarget)
     }
     return getUpstreamStatus(target.worktree.path, pushTarget, localGitOptionsForTarget(target))
+  }
+
+  async getRuntimeGitBranchReturnState(worktreeSelector: string): Promise<BranchReturnState> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
+    if (target.connectionId) {
+      if (!provider) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
+      return getBranchReturnStateViaExec((argv) => provider.exec(argv, target.worktree.path))
+    }
+    return getBranchReturnStateViaExec((argv) =>
+      gitExecFileAsync(argv, {
+        cwd: target.worktree.path,
+        ...localGitOptionsForTarget(target)
+      })
+    )
+  }
+
+  async deleteRuntimeGitBranch(
+    worktreeSelector: string,
+    branch: string
+  ): Promise<{ ok: true; branch: string }> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
+    if (target.connectionId) {
+      if (!provider) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
+      assertValidBranchName(branch)
+      await provider.exec(['branch', '-d', branch], target.worktree.path)
+      return { ok: true, branch }
+    }
+    await deleteLocalBranch(target.worktree.path, branch, localGitOptionsForTarget(target))
+    return { ok: true, branch }
   }
 
   async fetchRuntimeGit(

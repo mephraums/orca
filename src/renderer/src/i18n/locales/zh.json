@@ -4343,7 +4343,11 @@
           "setParentWorkspace": "设置父工作树...",
           "workspaceSection": "工作区",
           "primaryDeleteDisabled": "主工作树不能删除。请改为移除项目。",
-          "deleteWorktree": "删除工作树"
+          "deleteWorktree": "删除工作树",
+          "switchedToBranch": "Switched to",
+          "switchBranchFailed": "Could not switch branch",
+          "deletedBranchAndSwitched": "Deleted branch and switched back",
+          "deleteBranchFailed": "Could not delete branch"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",

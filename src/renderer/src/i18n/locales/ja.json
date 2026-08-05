@@ -4343,7 +4343,11 @@
           "setParentWorkspace": "親ワークツリーを設定...",
           "workspaceSection": "ワークスペース",
           "primaryDeleteDisabled": "プライマリワークツリーは削除できません。代わりにプロジェクトを削除してください。",
-          "deleteWorktree": "ワークツリーを削除"
+          "deleteWorktree": "ワークツリーを削除",
+          "switchedToBranch": "Switched to",
+          "switchBranchFailed": "Could not switch branch",
+          "deletedBranchAndSwitched": "Deleted branch and switched back",
+          "deleteBranchFailed": "Could not delete branch"
         },
         "WorktreeList": {
           "d880ea0744": "グループを作成し、このプロジェクトをそのグループに移動します。",
