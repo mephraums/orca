@@ -8,6 +8,7 @@ import { getGitPaneSearchEntries } from './git-search'
 import { SearchableSetting } from './SearchableSetting'
 import { matchesSettingsSearch } from './settings-search'
 import { AutoRenameBranchFromWorkSetting } from './AutoRenameBranchFromWorkSetting'
+import { PrWorkspacePromptSetting } from './PrWorkspacePromptSetting'
 import {
   CompareAgainstUpstreamSetting,
   compareAgainstUpstreamMatchesSearch
@@ -311,6 +312,11 @@ export function GitPane({
         settingsSearchQuery={searchQuery}
       />
     ) : null,
+    <PrWorkspacePromptSetting
+      key="pr-workspace-prompt"
+      settings={settings}
+      updateSettings={updateSettings}
+    />,
     matchesSettingsSearch(searchQuery, {
       title: translate('auto.components.settings.GitPane.e02ea23a32', 'Orca Attribution'),
       description: translate(

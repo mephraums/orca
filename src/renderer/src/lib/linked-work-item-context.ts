@@ -1,3 +1,4 @@
+import { buildPrWorkspacePrompt } from '../../../shared/pr-workspace-prompt'
 import type { TaskProvider } from '../../../shared/types'
 
 export type LinkedWorkItemContext = {
@@ -176,14 +177,19 @@ export function getLinkedWorkItemPromptContext(
     : { linkedUrls: [], linkedContextBlocks: [] }
 }
 
-export function getLaunchableWorkItemDraftContent(args: {
-  provider?: TaskProvider
-  pasteContent?: string
-  url: string
-  title?: string
-  linearIdentifier?: string
-  linkedContext?: LinkedWorkItemContext
-}): string {
+export function getLaunchableWorkItemDraftContent(
+  args: {
+    provider?: TaskProvider
+    pasteContent?: string
+    url: string
+    title?: string
+    type?: string | null
+    number?: number | null
+    linearIdentifier?: string
+    linkedContext?: LinkedWorkItemContext
+  },
+  options?: { prPromptTemplate?: string }
+): string {
   if (args.pasteContent?.trim()) {
     return args.pasteContent
   }
@@ -196,7 +202,23 @@ export function getLaunchableWorkItemDraftContent(args: {
     })
     return linearBlock ? formatDraftContextBlock(linearBlock) : ''
   }
-  return args.url
+  return resolvePrDraftPrompt(args, options?.prPromptTemplate) ?? args.url
+}
+
+function resolvePrDraftPrompt(
+  item: { url: string; title?: string; type?: string | null; number?: number | null },
+  template: string | undefined
+): string | null {
+  if (!template) {
+    return null
+  }
+  return buildPrWorkspacePrompt({
+    template,
+    type: item.type,
+    number: item.number,
+    url: item.url,
+    title: item.title
+  })
 }
 
 export function resolveQuickCreateLinkedWorkItemPrompt(
@@ -207,13 +229,15 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
           number: number
           url: string
           title?: string
+          type?: string | null
           linearIdentifier?: string
         },
-        'provider' | 'number' | 'url' | 'title' | 'linearIdentifier'
+        'provider' | 'number' | 'url' | 'title' | 'type' | 'linearIdentifier'
       > & { linkedContext?: LinkedWorkItemContext })
     | null
     | undefined,
-  note: string
+  note: string,
+  options?: { prPromptTemplate?: string }
 ): { prompt: string; draftPrompt: string | null } {
   const trimmedNote = note.trim()
   const linearBlock = isLinearWorkItemReference(linkedWorkItem)
@@ -226,11 +250,16 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
     : null
   const linearDraft = linearBlock ? formatDraftContextBlock(linearBlock) : null
   const linkedUrl = linkedWorkItem?.url?.trim() || null
+  const prPrompt = linkedWorkItem
+    ? resolvePrDraftPrompt(linkedWorkItem, options?.prPromptTemplate)
+    : null
   const draftPrompt = linearDraft
     ? [trimmedNote, linearDraft].filter(Boolean).join('\n\n')
-    : linkedUrl
-      ? [trimmedNote, linkedUrl].filter(Boolean).join('\n\n')
-      : null
+    : prPrompt
+      ? [trimmedNote, prPrompt].filter(Boolean).join('\n\n')
+      : linkedUrl
+        ? [trimmedNote, linkedUrl].filter(Boolean).join('\n\n')
+        : null
   const isLinearTypedOnly = linkedWorkItem?.number === 0 && Boolean(trimmedNote) && !draftPrompt
   return {
     prompt: isLinearTypedOnly ? trimmedNote : '',

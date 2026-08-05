@@ -49,6 +49,7 @@ type SubmitFolderWorkspaceCreateParams = {
   agentEnv?: Record<string, string>
   sessionOptions?: Record<string, SessionOptionValue>
   terminalWindowsShell?: string | null
+  prPromptTemplate?: string
   isRemote?: boolean
   launchSource?: LaunchSource
   runtimeEnvironmentId?: string | null
@@ -77,10 +78,12 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
   platform: NodeJS.Platform
   shell?: AgentStartupShell
   isRemote: boolean
+  prPromptTemplate?: string
 }): AgentStartupPlan | null {
   const { prompt, draftPrompt } = resolveQuickCreateLinkedWorkItemPrompt(
     args.linkedWorkItem,
-    args.note
+    args.note,
+    args.prPromptTemplate ? { prPromptTemplate: args.prPromptTemplate } : undefined
   )
   const linkedDraftPrompt = (draftPrompt ?? prompt.trim()) || null
   const draftLaunchPlan = linkedDraftPrompt
@@ -167,6 +170,7 @@ export async function submitFolderWorkspaceCreate({
   agentEnv,
   sessionOptions,
   terminalWindowsShell,
+  prPromptTemplate,
   launchSource = 'sidebar',
   runtimeEnvironmentId = null,
   createFolderWorkspace,
@@ -199,7 +203,8 @@ export async function submitFolderWorkspaceCreate({
           sessionOptions,
           platform: launchPlatform,
           shell: launchShell,
-          isRemote: launchIsRemote
+          isRemote: launchIsRemote,
+          ...(prPromptTemplate ? { prPromptTemplate } : {})
         })
       : quickAgent
         ? buildAgentStartupPlan({

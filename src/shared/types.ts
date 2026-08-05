@@ -287,6 +287,8 @@ export type Repo = {
   projectGroupOrder?: number
   /** Repo-specific source-control AI overrides. Missing fields inherit global settings. */
   sourceControlAi?: RepoSourceControlAiOverrides
+  /** Per-repo override for the PR/MR workspace launch prompt. Blank inherits the global template. */
+  prWorkspacePromptTemplate?: string
   /** Transitional source for ProjectHostSetup.setupMethod while Repo remains compatibility storage. */
   projectHostSetupMethod?: RepoProjectHostSetupMethod
 }
@@ -2934,6 +2936,9 @@ export type GlobalSettings = {
   commitMessageAi?: CommitMessageAiSettings
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
+  /** Prompt prefilled when a workspace launches from a PR/MR. Undefined uses the
+   *  built-in `/review {{pr_number}}`; blank restores the bare-URL prefill. */
+  prWorkspacePromptTemplate?: string
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
   /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.

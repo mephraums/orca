@@ -5,6 +5,7 @@ import {
   type AgentStartupPlan
 } from '@/lib/tui-agent-startup'
 import { resolveQuickCreateLinkedWorkItemPrompt } from '@/lib/linked-work-item-context'
+import { getPrWorkspacePromptTemplate } from '@/lib/pr-workspace-prompt-template'
 import { pickQuickWorkspaceAgent } from '@/lib/quick-workspace-agent-selection'
 import type {
   PendingWorktreeCreation,
@@ -45,6 +46,7 @@ export type GitHubWorkItemBackgroundStoreSnapshot = {
           | 'agentDefaultArgs'
           | 'agentDefaultEnv'
           | 'terminalWindowsShell'
+          | 'prWorkspacePromptTemplate'
         >
       >
     | null
@@ -68,13 +70,11 @@ type QuickCreateLinkedWorkItemPromptResult = ReturnType<
   typeof resolveQuickCreateLinkedWorkItemPrompt
 >
 
-function resolveGitHubWorkItemPrompt(item: GitHubWorkItem): QuickCreateLinkedWorkItemPromptResult {
-  const resolver = resolveQuickCreateLinkedWorkItemPrompt as unknown as (
-    linkedWorkItem: GitHubWorkItem,
-    note: string,
-    opts?: { cliAvailable: boolean }
-  ) => QuickCreateLinkedWorkItemPromptResult
-  return resolver(item, '', { cliAvailable: false })
+function resolveGitHubWorkItemPrompt(
+  item: GitHubWorkItem,
+  prPromptTemplate: string
+): QuickCreateLinkedWorkItemPromptResult {
+  return resolveQuickCreateLinkedWorkItemPrompt(item, '', { prPromptTemplate })
 }
 
 export function buildGitHubWorkItemBackendStartup(
@@ -180,7 +180,10 @@ export function buildGitHubWorkItemStartupPlan(args: {
   if (!agent) {
     return { startupPlan: null, quickPrompt: '', quickTelemetry: null }
   }
-  const { prompt: quickPrompt, draftPrompt } = resolveGitHubWorkItemPrompt(item)
+  const { prompt: quickPrompt, draftPrompt } = resolveGitHubWorkItemPrompt(
+    item,
+    getPrWorkspacePromptTemplate({ settings: store.settings, repo })
+  )
   // Why: runtime-owned repos launch on their owner host, not on the client
   // desktop, so startup shell quoting must use the runtime platform.
   const platform = resolveGitHubWorkItemLaunchPlatform(store, repo)

@@ -213,7 +213,11 @@ describe('resolveQuickCreateLinkedWorkItemPrompt', () => {
   it('drafts the note above a labeled Linear URL when the identifier is missing', () => {
     expect(
       resolveQuickCreateLinkedWorkItemPrompt(
-        { provider: 'linear', number: 0, url: 'https://linear.app/acme/issue/ENG-123/test' },
+        {
+          provider: 'linear',
+          number: 0,
+          url: 'https://linear.app/acme/issue/ENG-123/test'
+        },
         'note'
       )
     ).toEqual({
@@ -306,5 +310,66 @@ describe('buildAgentPromptWithContext', () => {
     )
     expectNoLinearTicketContent(prompt)
     expectNoProductWorkflowDirection(prompt)
+  })
+})
+
+describe('PR workspace prompt template', () => {
+  const PR_ITEM = {
+    type: 'pr' as const,
+    number: 7835,
+    url: 'https://github.com/acme/repo/pull/7835'
+  }
+
+  it('drafts the review command instead of the bare URL for quick creates', () => {
+    expect(
+      resolveQuickCreateLinkedWorkItemPrompt(PR_ITEM, '', {
+        prPromptTemplate: '/review {{pr_number}}'
+      })
+    ).toEqual({ prompt: '', draftPrompt: '/review 7835' })
+  })
+
+  it('keeps a typed note above the review command', () => {
+    expect(
+      resolveQuickCreateLinkedWorkItemPrompt(PR_ITEM, 'focus on the auth path', {
+        prPromptTemplate: '/review {{pr_number}}'
+      }).draftPrompt
+    ).toBe('focus on the auth path\n\n/review 7835')
+  })
+
+  it('leaves issues on the URL prefill', () => {
+    expect(
+      resolveQuickCreateLinkedWorkItemPrompt(
+        {
+          type: 'issue',
+          number: 42,
+          url: 'https://github.com/acme/repo/issues/42'
+        },
+        '',
+        { prPromptTemplate: '/review {{pr_number}}' }
+      ).draftPrompt
+    ).toBe('https://github.com/acme/repo/issues/42')
+  })
+
+  it('drafts the review command for direct PR launches', () => {
+    expect(
+      getLaunchableWorkItemDraftContent(PR_ITEM, {
+        prPromptTemplate: '/review {{pr_number}}'
+      })
+    ).toBe('/review 7835')
+  })
+
+  it('falls back to the URL when no template is configured', () => {
+    expect(getLaunchableWorkItemDraftContent(PR_ITEM, { prPromptTemplate: '' })).toBe(
+      'https://github.com/acme/repo/pull/7835'
+    )
+  })
+
+  it('keeps explicit paste content ahead of the template', () => {
+    expect(
+      getLaunchableWorkItemDraftContent(
+        { ...PR_ITEM, pasteContent: 'fix the checks' },
+        { prPromptTemplate: '/review {{pr_number}}' }
+      )
+    ).toBe('fix the checks')
   })
 })

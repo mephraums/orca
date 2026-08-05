@@ -114,6 +114,7 @@ export type RepoUpdate = Partial<
     | 'importedExternalWorktreePaths'
     | 'projectGroupId'
     | 'projectGroupOrder'
+    | 'prWorkspacePromptTemplate'
   >
 > & {
   sourceControlAi?: Repo['sourceControlAi'] | null

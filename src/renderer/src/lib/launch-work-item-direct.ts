@@ -157,7 +157,7 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
   let startupPlan = null as ReturnType<typeof buildDirectWorkItemAgentStartupPlan>['startupPlan']
   let effectiveAgent: TuiAgent | null = null
   let draftLaunchedNatively = false
-  const draftContent = await getDirectWorkItemDraftContent(item, repoConnectionId)
+  const draftContent = await getDirectWorkItemDraftContent(item, repoConnectionId, repoId)
   let startupPlanFailed = false
   try {
     const result = await store.createWorktree(

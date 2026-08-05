@@ -1350,10 +1350,17 @@ function sanitizeRepoUpdatesForPersistence<
       | 'worktreeBasePath'
       | 'projectHostSetupMethod'
       | 'forkSyncMode'
+      | 'prWorkspacePromptTemplate'
     >
   >
 >(updates: T): T {
   const sanitized = { ...updates }
+  if ('prWorkspacePromptTemplate' in sanitized) {
+    const template = sanitized.prWorkspacePromptTemplate
+    // Why: a blank override means "inherit the global template", stored as an absent key.
+    sanitized.prWorkspacePromptTemplate =
+      typeof template === 'string' && template.trim() ? template.trim() : undefined
+  }
   if ('badgeColor' in sanitized) {
     const badgeColor = normalizeRepoBadgeColor(sanitized.badgeColor)
     if (!badgeColor) {
@@ -4301,6 +4308,7 @@ export class Store {
         | 'projectGroupId'
         | 'projectGroupOrder'
         | 'projectHostSetupMethod'
+        | 'prWorkspacePromptTemplate'
       >
     > & {
       sourceControlAi?: Repo['sourceControlAi'] | null
@@ -4345,6 +4353,13 @@ export class Store {
     if ('worktreeBasePath' in sanitizedUpdates && sanitizedUpdates.worktreeBasePath === undefined) {
       delete repo.worktreeBasePath
       delete sanitizedUpdates.worktreeBasePath
+    }
+    if (
+      'prWorkspacePromptTemplate' in sanitizedUpdates &&
+      sanitizedUpdates.prWorkspacePromptTemplate === undefined
+    ) {
+      delete repo.prWorkspacePromptTemplate
+      delete sanitizedUpdates.prWorkspacePromptTemplate
     }
     if (
       'externalWorktreeVisibility' in sanitizedUpdates &&
