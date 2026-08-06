@@ -1199,11 +1199,13 @@ const WorktreeCard = React.memo(function WorktreeCard({
     showIdentityInNewCard ||
     showDetachedHeadInMetaRow ||
     showConflictOperationBadge ||
+    syncIndicator ||
     cacheStartedAt != null ||
     showMetaRowDetails
   )
+  // Why: the sync badge must be able to summon the row itself — under the new card style nothing else may populate it.
   const hasMetaRow = compactCards
-    ? hasMetadataBadge || cacheStartedAt != null
+    ? hasMetadataBadge || syncIndicator !== null || cacheStartedAt != null
     : hasDetailedMetaRowContent
   const showHeaderActions = showTitleRowPrimary || showDeleteQuickAction
   // Why: normalize the title once so title/branch de-dupe and identity-only hover eligibility stay in sync.
