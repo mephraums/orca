@@ -19,7 +19,8 @@ import {
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { shouldAllowComposerEnterSubmitTarget } from '@/lib/new-workspace-enter-guard'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
-import MultiPrSelectList, { prSelectionKey } from '@/components/new-workspace/MultiPrSelectList'
+import MultiPrSelectList from '@/components/new-workspace/MultiPrSelectList'
+import { prSelectionKey, togglePrSelection } from '@/lib/pr-batch-selection'
 import { createWorktreesFromPRs, getBatchPrWorktreeSummary } from '@/lib/create-worktrees-from-prs'
 import { toast } from 'sonner'
 import type {
@@ -200,12 +201,7 @@ function QuickTabBody({
     [selectedPrs]
   )
   const handleTogglePr = useCallback((item: GitHubWorkItem): void => {
-    setSelectedPrs((prev) => {
-      const key = prSelectionKey(item)
-      return prev.some((entry) => prSelectionKey(entry) === key)
-        ? prev.filter((entry) => prSelectionKey(entry) !== key)
-        : [...prev, item]
-    })
+    setSelectedPrs((prev) => togglePrSelection(prev, item))
   }, [])
   const handleMultiPrModeChange = useCallback((next: boolean): void => {
     setMultiPrMode(next)

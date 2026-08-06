@@ -4,6 +4,7 @@ import type {
   TuiAgent,
   WorkspaceCreateTelemetrySource
 } from '../../../shared/types'
+import type { LaunchSource } from '../../../shared/telemetry-events'
 
 export type BatchPrWorktreeResult = {
   created: number
@@ -16,6 +17,7 @@ export type CreateWorktreesFromPRsArgs = {
   repoId: string
   agent?: TuiAgent | null
   telemetrySource?: WorkspaceCreateTelemetrySource
+  launchSource?: LaunchSource
 }
 
 /**
@@ -29,7 +31,8 @@ export async function createWorktreesFromPRs({
   items,
   repoId,
   agent,
-  telemetrySource
+  telemetrySource,
+  launchSource
 }: CreateWorktreesFromPRsArgs): Promise<BatchPrWorktreeResult> {
   let created = 0
   let blocked = 0
@@ -42,7 +45,7 @@ export async function createWorktreesFromPRs({
     const ok = await launchWorkItemDirect({
       item: { ...item, repoId },
       repoId,
-      launchSource: 'new_workspace_composer',
+      launchSource: launchSource ?? 'new_workspace_composer',
       ...(telemetrySource ? { telemetrySource } : {}),
       ...(agent ? { agentOverride: agent } : {}),
       openModalFallback: () => {

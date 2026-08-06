@@ -23,6 +23,7 @@ import {
   GitPullRequest,
   GitPullRequestDraft,
   List,
+  ListChecks,
   LoaderCircle,
   Minus,
   Plus,
@@ -48,6 +49,7 @@ import {
 } from '../../../shared/execution-host'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Command,
@@ -267,6 +269,19 @@ import {
   type TaskPageJiraLoadError
 } from '@/components/task-page-jira-load-state'
 import { deriveTaskPagePRCheckSummary } from '@/components/task-page-pr-check-summary'
+import {
+  createWorktreesFromPRs,
+  getBatchPrWorktreeSummary,
+  type BatchPrWorktreeResult
+} from '@/lib/create-worktrees-from-prs'
+import {
+  addPrSelections,
+  allPrsSelected,
+  combineBatchPrWorktreeResults,
+  groupPrSelectionByRepo,
+  prSelectionKey,
+  togglePrSelection
+} from '@/lib/pr-batch-selection'
 import { presentGitHubPRMergeState } from '@/components/github-pr-merge-state'
 import { buildJiraCreateTextAdf } from '@/components/jira-create-adf'
 import {
@@ -389,6 +404,9 @@ const GITHUB_TASK_GRID_CLASS =
   'min-w-[790px] grid-cols-[72px_minmax(320px,1fr)_84px_100px_92px_122px]'
 const GITHUB_PR_TASK_GRID_CLASS =
   'min-w-[1020px] grid-cols-[72px_minmax(360px,2fr)_132px_128px_132px_92px_158px]'
+// Why: multi-select adds a leading checkbox to the ID column; the wider column shifts where the sticky title column pins (left-[120px] overrides).
+const GITHUB_PR_TASK_MULTI_SELECT_GRID_CLASS =
+  'min-w-[1048px] grid-cols-[100px_minmax(360px,2fr)_132px_128px_132px_92px_158px]'
 const GITHUB_TASK_ROW_SURFACE_CLASS =
   '[background:color-mix(in_srgb,var(--muted)_50%,var(--background))]'
 const GITHUB_TASK_ROW_HOVER_SURFACE_CLASS =
@@ -6082,9 +6100,94 @@ export default function TaskPage(): React.JSX.Element {
     return null
   }, [activeGithubTaskKind, perRepoSourceState])
   const showPRManagementColumns = activeGithubTaskKind === 'prs'
+
+  // Why: multi-select lives with the list it annotates — it is a transient view mode of the GitHub PR table, not app state.
+  const [prMultiSelectActive, setPrMultiSelectActive] = useState(false)
+  const [selectedBatchPrs, setSelectedBatchPrs] = useState<GitHubWorkItem[]>([])
+  const [batchPrStarting, setBatchPrStarting] = useState(false)
+  const selectedBatchPrKeys = useMemo(
+    () => new Set(selectedBatchPrs.map((item) => prSelectionKey(item))),
+    [selectedBatchPrs]
+  )
+  const readyVisiblePrs = useMemo(
+    () => filteredWorkItems.filter((item) => item.type === 'pr' && !isTaskPageGitHubDraftPR(item)),
+    [filteredWorkItems]
+  )
+  const allVisibleReadyPrsSelected = allPrsSelected(selectedBatchPrKeys, readyVisiblePrs)
+  // Why: cross-page picks can outlive the visible page; offer Clear when there is nothing left to add here.
+  const prMultiSelectShowClearAll =
+    allVisibleReadyPrsSelected || (readyVisiblePrs.length === 0 && selectedBatchPrs.length > 0)
+
+  useEffect(() => {
+    // Why: selection is only meaningful on the GitHub PR list; leaving it drops stale picks instead of batch-starting unseen rows later.
+    if (taskSource !== 'github' || githubMode !== 'items' || activeGithubTaskKind !== 'prs') {
+      setPrMultiSelectActive(false)
+      setSelectedBatchPrs([])
+    }
+  }, [activeGithubTaskKind, githubMode, taskSource])
+
+  const handleTogglePrMultiSelectMode = useCallback((): void => {
+    setPrMultiSelectActive((active) => !active)
+    setSelectedBatchPrs([])
+  }, [])
+
+  const handleToggleBatchPr = useCallback((item: GitHubWorkItem): void => {
+    setSelectedBatchPrs((prev) => togglePrSelection(prev, item))
+  }, [])
+
+  const handleSelectAllReadyPrs = useCallback((): void => {
+    setSelectedBatchPrs((prev) =>
+      prMultiSelectShowClearAll ? [] : addPrSelections(prev, readyVisiblePrs)
+    )
+  }, [prMultiSelectShowClearAll, readyVisiblePrs])
+
+  const handleStartSelectedPrWorkspaces = useCallback(async (): Promise<void> => {
+    const items = selectedBatchPrs
+    if (items.length === 0 || batchPrStarting) {
+      return
+    }
+    useAppStore.getState().recordFeatureInteraction('github-tasks')
+    setBatchPrStarting(true)
+    try {
+      const results: BatchPrWorktreeResult[] = []
+      // Why: sequential per repo — the batch primitive is itself sequential to avoid branch-collision and terminal-focus races.
+      for (const group of groupPrSelectionByRepo(items)) {
+        results.push(
+          await createWorktreesFromPRs({
+            items: group.items,
+            repoId: group.repoId,
+            launchSource: 'task_page',
+            telemetrySource: 'sidebar'
+          })
+        )
+      }
+      const combined = combineBatchPrWorktreeResults(results)
+      if (combined.created > 0) {
+        toast.success(getBatchPrWorktreeSummary(combined))
+        setSelectedBatchPrs([])
+        setPrMultiSelectActive(false)
+      } else {
+        toast.error(getBatchPrWorktreeSummary(combined))
+      }
+    } finally {
+      setBatchPrStarting(false)
+    }
+  }, [batchPrStarting, selectedBatchPrs])
+
+  const prMultiSelectColumnsActive = showPRManagementColumns && prMultiSelectActive
   const githubTaskGridClass = showPRManagementColumns
-    ? GITHUB_PR_TASK_GRID_CLASS
+    ? prMultiSelectColumnsActive
+      ? GITHUB_PR_TASK_MULTI_SELECT_GRID_CLASS
+      : GITHUB_PR_TASK_GRID_CLASS
     : GITHUB_TASK_GRID_CLASS
+  const githubTaskStickyTitleHeaderClass = cn(
+    GITHUB_TASK_STICKY_TITLE_HEADER_CLASS,
+    prMultiSelectColumnsActive && 'left-[120px]'
+  )
+  const githubTaskStickyTitleCellClass = cn(
+    GITHUB_TASK_STICKY_TITLE_CELL_CLASS,
+    prMultiSelectColumnsActive && 'left-[120px]'
+  )
 
   const ensurePRChecksLoaded = useCallback(
     (item: GitHubWorkItem): void => {
@@ -8336,6 +8439,48 @@ export default function TaskPage(): React.JSX.Element {
                         className="flex shrink-0 items-center gap-2"
                         data-contextual-tour-target="tasks-actions"
                       >
+                        {showPRManagementColumns ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={handleTogglePrMultiSelectMode}
+                                aria-pressed={prMultiSelectActive}
+                                aria-label={
+                                  prMultiSelectActive
+                                    ? translate(
+                                        'auto.components.TaskPage.multiSelectDone',
+                                        'Done selecting'
+                                      )
+                                    : translate(
+                                        'auto.components.TaskPage.multiSelectStart',
+                                        'Select multiple pull requests'
+                                      )
+                                }
+                                className={cn(
+                                  'size-8 border-border/50 backdrop-blur-md',
+                                  prMultiSelectActive
+                                    ? 'border-foreground/40 bg-muted/70 text-foreground shadow-sm'
+                                    : 'bg-transparent hover:bg-muted/50 supports-[backdrop-filter]:bg-transparent'
+                                )}
+                              >
+                                <ListChecks className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" sideOffset={6}>
+                              {prMultiSelectActive
+                                ? translate(
+                                    'auto.components.TaskPage.multiSelectDone',
+                                    'Done selecting'
+                                  )
+                                : translate(
+                                    'auto.components.TaskPage.multiSelectStart',
+                                    'Select multiple pull requests'
+                                  )}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -8410,6 +8555,67 @@ export default function TaskPage(): React.JSX.Element {
                         </Tooltip>
                       </div>
                     </div>
+
+                    {prMultiSelectColumnsActive ? (
+                      <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/50 py-2">
+                        <span className="text-xs text-muted-foreground">
+                          {selectedBatchPrs.length > 0
+                            ? translate(
+                                'auto.components.TaskPage.multiSelectCount',
+                                '{{count}} selected',
+                                { count: selectedBatchPrs.length }
+                              )
+                            : translate(
+                                'auto.components.TaskPage.multiSelectHint',
+                                'Select pull requests to start workspaces'
+                              )}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            onClick={handleSelectAllReadyPrs}
+                            disabled={readyVisiblePrs.length === 0 && selectedBatchPrs.length === 0}
+                          >
+                            {prMultiSelectShowClearAll
+                              ? translate('auto.components.TaskPage.multiSelectClear', 'Clear all')
+                              : translate(
+                                  'auto.components.TaskPage.multiSelectAllReady',
+                                  'Select all ready'
+                                )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="xs"
+                            className="gap-1 font-semibold"
+                            disabled={selectedBatchPrs.length === 0 || batchPrStarting}
+                            onClick={() => void handleStartSelectedPrWorkspaces()}
+                          >
+                            {batchPrStarting ? (
+                              <LoaderCircle className="size-3 animate-spin" />
+                            ) : (
+                              <ArrowRight className="size-3" />
+                            )}
+                            {selectedBatchPrs.length === 1
+                              ? translate(
+                                  'auto.components.TaskPage.startOneWorkspace',
+                                  'Start 1 workspace'
+                                )
+                              : selectedBatchPrs.length > 1
+                                ? translate(
+                                    'auto.components.TaskPage.startWorkspacesCount',
+                                    'Start {{value0}} workspaces',
+                                    { value0: selectedBatchPrs.length }
+                                  )
+                                : translate(
+                                    'auto.components.TaskPage.startWorkspaces',
+                                    'Start workspaces'
+                                  )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {(() => {
                       // Why: show the source-slug chip only when the selector can't render (no upstream to toggle); otherwise it duplicates the selector.
@@ -9056,7 +9262,7 @@ export default function TaskPage(): React.JSX.Element {
                   <span className={GITHUB_TASK_STICKY_ID_HEADER_CLASS}>
                     {translate('auto.components.TaskPage.eb10c32872', 'ID')}
                   </span>
-                  <span className={GITHUB_TASK_STICKY_TITLE_HEADER_CLASS}>
+                  <span className={githubTaskStickyTitleHeaderClass}>
                     {translate('auto.components.TaskPage.5eccb3c841', 'Title / Context')}
                   </span>
                   {activeGithubTaskKind === 'issues' ? (
@@ -9190,7 +9396,7 @@ export default function TaskPage(): React.JSX.Element {
                         <div className={GITHUB_TASK_STICKY_ID_CELL_CLASS}>
                           <div className="h-7 w-16 animate-pulse rounded-lg bg-muted/70" />
                         </div>
-                        <div className={GITHUB_TASK_STICKY_TITLE_CELL_CLASS}>
+                        <div className={githubTaskStickyTitleCellClass}>
                           <div className="h-4 w-3/5 animate-pulse rounded bg-muted/70" />
                           <div className="mt-2 h-3 w-2/5 animate-pulse rounded bg-muted/60" />
                         </div>
@@ -9258,6 +9464,9 @@ export default function TaskPage(): React.JSX.Element {
                       const attachedWorkspaceLabel = attachedWorkspace
                         ? getGithubWorkItemWorkspaceAttachmentLabel(attachedWorkspace)
                         : null
+                      const rowSelectable = prMultiSelectColumnsActive && item.type === 'pr'
+                      const rowSelected =
+                        rowSelectable && selectedBatchPrKeys.has(prSelectionKey(item))
                       const githubTaskIdPill = (
                         <span
                           className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-muted-foreground"
@@ -9286,13 +9495,21 @@ export default function TaskPage(): React.JSX.Element {
                         <div
                           // Why: key on repoId+item.id — repos sharing an upstream reuse item.id, so a bare key collides and React silently drops rows.
                           key={`${item.repoId}:${item.id}`}
-                          role="button"
+                          // Why: in multi-select mode the whole row is the toggle target (mirrors MultiPrSelectList), so it announces as a checkbox.
+                          role={rowSelectable ? 'checkbox' : 'button'}
+                          aria-checked={rowSelectable ? rowSelected : undefined}
                           tabIndex={0}
-                          onClick={() => openGitHubDetailPage(item)}
+                          onClick={() =>
+                            rowSelectable ? handleToggleBatchPr(item) : openGitHubDetailPage(item)
+                          }
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault()
-                              openGitHubDetailPage(item)
+                              if (rowSelectable) {
+                                handleToggleBatchPr(item)
+                              } else {
+                                openGitHubDetailPage(item)
+                              }
                             }
                           }}
                           className={cn(
@@ -9302,6 +9519,15 @@ export default function TaskPage(): React.JSX.Element {
                           )}
                         >
                           <div className={GITHUB_TASK_STICKY_ID_CELL_CLASS}>
+                            {rowSelectable ? (
+                              // Why: decorative — the row itself carries the checkbox role, so this box only mirrors its state.
+                              <Checkbox
+                                checked={rowSelected}
+                                tabIndex={-1}
+                                aria-hidden="true"
+                                className="pointer-events-none mr-2 shrink-0"
+                              />
+                            ) : null}
                             {isTaskPageGitHubDraftPR(item) ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>{githubTaskIdPill}</TooltipTrigger>
@@ -9314,7 +9540,7 @@ export default function TaskPage(): React.JSX.Element {
                             )}
                           </div>
 
-                          <div className={GITHUB_TASK_STICKY_TITLE_CELL_CLASS}>
+                          <div className={githubTaskStickyTitleCellClass}>
                             <div className="flex min-w-0 items-center gap-2">
                               <h3 className="truncate text-sm font-semibold text-foreground">
                                 {item.title}

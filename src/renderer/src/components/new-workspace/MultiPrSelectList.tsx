@@ -10,14 +10,11 @@ import {
   isTaskPageGitHubDraftPR
 } from '@/components/task-page-github-work-item-status'
 import { TaskPageGitHubWorkItemStateBadge } from '@/components/task-page-github-work-item-status-badge'
+import { prSelectionKey } from '@/lib/pr-batch-selection'
 import type { GitHubWorkItem } from '../../../../shared/types'
 
 const RESULT_LIMIT = 30
 const QUERY_DEBOUNCE_MS = 300
-
-export function prSelectionKey(item: Pick<GitHubWorkItem, 'repoId' | 'number'>): string {
-  return `${item.repoId}:${item.number}`
-}
 
 export default function MultiPrSelectList({
   repoId,
