@@ -9583,6 +9583,7 @@
             "6d1e0a7c3b": "commit 파일을 로드하지 못했습니다"
           },
           "HostedReviewActions": {
+            "branchCleanupMore": "추가 브랜치 작업",
             "4d5fb5a284": "닫기",
             "9845a71e17": "추가 작업",
             "2bfaf4379c": "추가 {{value0}} 작업",

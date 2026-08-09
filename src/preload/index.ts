@@ -3052,6 +3052,7 @@ const api = {
       worktreePath: string
       branch: string
       connectionId?: string
+      force?: boolean
     }): Promise<void> => ipcRenderer.invoke('git:deleteBranch', args),
     abortMerge: (args: { worktreePath: string; connectionId?: string }): Promise<void> =>
       ipcRenderer.invoke('git:abortMerge', args),

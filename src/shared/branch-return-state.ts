@@ -13,8 +13,12 @@ export type BranchReturnState = {
   isDirty: boolean
   /** Every commit on the branch is already reachable from the default branch. */
   isMergedIntoDefault: boolean
-  /** Upstream was configured and has since been deleted — the merged-PR signal. */
-  isUpstreamGone: boolean
+  /**
+   * The branch's combined change is already in the default branch as a single
+   * differently-shaped commit — how squash and rebase merges land. Ancestry
+   * never sees those, so `git branch -d` refuses and deletion needs `-D`.
+   */
+  isSquashMergedIntoDefault: boolean
   /** Commits on the branch that the default branch does not contain. */
   unmergedCommits: number
 }

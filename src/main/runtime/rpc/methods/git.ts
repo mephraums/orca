@@ -8,6 +8,7 @@ import {
   GitBulkPaths,
   GitCheckIgnored,
   GitCheckout,
+  GitDeleteBranch,
   GitCommit,
   GitCommitCompare,
   GitCommitDiff,
@@ -164,9 +165,9 @@ export const GIT_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'git.deleteBranch',
-    params: GitCheckout,
+    params: GitDeleteBranch,
     handler: async (params, { runtime }) =>
-      runtime.deleteRuntimeGitBranch(params.worktree, params.branch)
+      runtime.deleteRuntimeGitBranch(params.worktree, params.branch, params.force)
   }),
   defineMethod({
     name: 'git.diff',

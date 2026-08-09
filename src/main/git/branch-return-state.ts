@@ -42,25 +42,49 @@ async function countUnmergedCommits(
   }
 }
 
-async function readIsUpstreamGone(exec: BranchStateExec, branch: string): Promise<boolean> {
-  let upstream = ''
+/**
+ * Whether the branch's whole change already sits in `base` as one commit of a
+ * different shape — what "Squash and merge" and rebase merges produce.
+ *
+ * Ancestry can't see those: the squash commit is a new object that never has the
+ * branch in its history, so `rev-list base..branch` keeps reporting the original
+ * commits forever. The check synthesises the branch's combined diff as a commit
+ * on top of the merge base and asks `git cherry` whether `base` already contains
+ * an identical patch. `commit-tree` writes one unreferenced object that git
+ * prunes; nothing in the repo is modified.
+ *
+ * `git cherry` prints `- <sha>` when the patch is already upstream and `+ <sha>`
+ * when it is not.
+ */
+async function readIsSquashMergedIntoDefault(
+  exec: BranchStateExec,
+  branch: string,
+  base: string
+): Promise<boolean> {
   try {
-    const { stdout } = await exec(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`])
-    upstream = stdout.trim()
+    const [{ stdout: mergeBase }, { stdout: tree }] = await Promise.all([
+      exec(['merge-base', base, branch]),
+      exec(['rev-parse', `${branch}^{tree}`])
+    ])
+    if (!mergeBase.trim() || !tree.trim()) {
+      return false
+    }
+    const { stdout: squashed } = await exec([
+      'commit-tree',
+      tree.trim(),
+      '-p',
+      mergeBase.trim(),
+      '-m',
+      'orca squash-merge probe'
+    ])
+    if (!squashed.trim()) {
+      return false
+    }
+    const { stdout: cherry } = await exec(['cherry', base, squashed.trim()])
+    return cherry.trim().startsWith('-')
   } catch {
-    // Why: no upstream configured at all is not the merged-PR signal.
+    // Why: an unreadable probe must not read as "safe to force delete".
     return false
-  }
-  if (!upstream) {
-    return false
-  }
-  try {
-    await exec(['rev-parse', '--verify', '--quiet', `refs/remotes/${upstream}`])
-    return false
-  } catch {
-    // Why: upstream is configured but its remote-tracking ref is gone — the
-    // branch was merged and the remote branch deleted.
-    return true
   }
 }
 
@@ -105,15 +129,17 @@ export async function getBranchReturnStateViaExec(
       defaultCompareRef,
       isDirty,
       isMergedIntoDefault: false,
-      isUpstreamGone: false,
+      isSquashMergedIntoDefault: false,
       unmergedCommits: 0
     }
   }
 
-  const [unmerged, isUpstreamGone] = await Promise.all([
-    countUnmergedCommits(exec, currentBranch, defaultCompareRef ?? defaultBranch),
-    readIsUpstreamGone(exec, currentBranch)
-  ])
+  const compareRef = defaultCompareRef ?? defaultBranch
+  const unmerged = await countUnmergedCommits(exec, currentBranch, compareRef)
+  // Why: the squash probe costs three more git calls, so only run it once
+  // ancestry has already come up short.
+  const isSquashMergedIntoDefault =
+    unmerged === 0 ? false : await readIsSquashMergedIntoDefault(exec, currentBranch, compareRef)
 
   return {
     currentBranch,
@@ -122,7 +148,7 @@ export async function getBranchReturnStateViaExec(
     isDirty,
     // Why: an unreadable count must not read as "safe to delete".
     isMergedIntoDefault: unmerged === 0,
-    isUpstreamGone,
+    isSquashMergedIntoDefault,
     unmergedCommits: unmerged ?? 0
   }
 }

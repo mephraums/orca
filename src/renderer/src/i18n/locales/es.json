@@ -9583,6 +9583,7 @@
             "6d1e0a7c3b": "No se pudieron cargar los archivos del commit"
           },
           "HostedReviewActions": {
+            "branchCleanupMore": "Más acciones de rama",
             "4d5fb5a284": "Cerrar",
             "9845a71e17": "Más acciones",
             "2bfaf4379c": "Más acciones de {{value0}}",

@@ -13,7 +13,7 @@ function state(overrides: Partial<BranchReturnState> = {}): BranchReturnState {
     defaultCompareRef: 'origin/master',
     isDirty: false,
     isMergedIntoDefault: true,
-    isUpstreamGone: true,
+    isSquashMergedIntoDefault: false,
     unmergedCommits: 0,
     ...overrides
   }
@@ -72,11 +72,27 @@ describe('resolvePrimaryWorkspaceBranchActions', () => {
     ).toContain('1 unmerged commit not in master')
   })
 
-  it('still allows deleting a merged branch whose remote is still present', () => {
-    expect(
-      resolvePrimaryWorkspaceBranchActions(state({ isUpstreamGone: false })).deleteBranchAndReturn
-        .enabled
-    ).toBe(true)
+  it('allows deleting a squash-merged branch, forcing because ancestry cannot see it', () => {
+    const actions = resolvePrimaryWorkspaceBranchActions(
+      state({ isMergedIntoDefault: false, isSquashMergedIntoDefault: true, unmergedCommits: 3 })
+    )
+    expect(actions.deleteBranchAndReturn.enabled).toBe(true)
+    expect(actions.deleteNeedsForce).toBe(true)
+  })
+
+  it('never forces when ancestry already proves the merge', () => {
+    expect(resolvePrimaryWorkspaceBranchActions(state()).deleteNeedsForce).toBe(false)
+  })
+
+  it('shows a disabled group with a reason when the read failed', () => {
+    const actions = resolvePrimaryWorkspaceBranchActions(null, { loadFailed: true })
+    expect(actions.visible).toBe(true)
+    expect(actions.returnToDefault.enabled).toBe(false)
+    expect(actions.deleteBranchAndReturn.disabledReason).toContain('Could not read this branch')
+  })
+
+  it('stays hidden while the first read is still in flight', () => {
+    expect(resolvePrimaryWorkspaceBranchActions(null).visible).toBe(false)
   })
 })
 

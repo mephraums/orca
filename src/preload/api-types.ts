@@ -2664,6 +2664,8 @@ export type PreloadApi = {
       worktreePath: string
       branch: string
       connectionId?: string
+      /** `-D` instead of `-d`; only for a branch proven merged by squash/rebase. */
+      force?: boolean
     }) => Promise<void>
     abortMerge: (args: { worktreePath: string; connectionId?: string }) => Promise<void>
     abortRebase: (args: { worktreePath: string; connectionId?: string }) => Promise<void>

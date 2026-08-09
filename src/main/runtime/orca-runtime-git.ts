@@ -401,7 +401,8 @@ export class RuntimeGitCommands {
 
   async deleteRuntimeGitBranch(
     worktreeSelector: string,
-    branch: string
+    branch: string,
+    force = false
   ): Promise<{ ok: true; branch: string }> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
@@ -410,10 +411,12 @@ export class RuntimeGitCommands {
         throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       assertValidBranchName(branch)
-      await provider.exec(['branch', '-d', branch], target.worktree.path)
+      await provider.exec(['branch', force ? '-D' : '-d', branch], target.worktree.path)
       return { ok: true, branch }
     }
-    await deleteLocalBranch(target.worktree.path, branch, localGitOptionsForTarget(target))
+    await deleteLocalBranch(target.worktree.path, branch, localGitOptionsForTarget(target), {
+      force
+    })
     return { ok: true, branch }
   }
 

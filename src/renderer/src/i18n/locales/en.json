@@ -9606,6 +9606,7 @@
             "6d1e0a7c3b": "Failed to load commit files"
           },
           "HostedReviewActions": {
+            "branchCleanupMore": "More branch actions",
             "4d5fb5a284": "Close",
             "9845a71e17": "More actions",
             "2bfaf4379c": "More {{value0}} actions",

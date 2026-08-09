@@ -19,8 +19,10 @@ import { presentGitLabMRMergeState } from './gitlab-mr-merge-state'
 import {
   ClosedReviewActions,
   HostedReviewActionError,
+  MergedPrimaryBranchActions,
   MergedReviewActions
 } from './HostedReviewStateActions'
+import { usePrimaryWorkspaceBranchCleanup } from '../sidebar/use-primary-workspace-branch-cleanup'
 import { useHostedReviewActions, type HostedReviewActionInfo } from './use-hosted-review-actions'
 import {
   RIGHT_SIDEBAR_MERGE_PRIMARY_BUTTON_CLASS,
@@ -101,6 +103,20 @@ export default function HostedReviewActions({
     // skip-confirm, main-worktree, and child-workspace safeguards cannot drift.
     runWorktreeDelete(worktree.id)
   }, [worktree.id])
+
+  const branchCleanup = usePrimaryWorkspaceBranchCleanup({
+    enabled: review.state === 'merged' && Boolean(worktree.isMainWorktree),
+    worktreeId: worktree.id,
+    worktreePath: worktree.path,
+    connectionId: repo.connectionId ?? null,
+    // Why: the merge just happened, so the local default ref is behind until the
+    // next fetch and the branch would otherwise read as unmerged.
+    revalidateUnmergedWithFetch: true
+  })
+  // Why: only offer to delete the branch this review is actually about — the
+  // checkout can have moved on since the PR was opened.
+  const cleanupMatchesReviewBranch =
+    !githubPR?.headRefName || githubPR.headRefName === branchCleanup.state?.currentBranch
 
   if (review.state === 'open') {
     return (
@@ -241,6 +257,13 @@ export default function HostedReviewActions({
     )
   }
   if (review.state === 'merged') {
+    // Why: "Delete Workspace" on the primary checkout means removing the whole
+    // project from Orca, which is not what post-merge cleanup asks for.
+    if (worktree.isMainWorktree) {
+      return branchCleanup.actions.visible && cleanupMatchesReviewBranch ? (
+        <MergedPrimaryBranchActions cleanup={branchCleanup} />
+      ) : null
+    }
     return (
       <MergedReviewActions
         isDeletingWorktree={isDeletingWorktree}

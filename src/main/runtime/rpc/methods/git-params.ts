@@ -250,6 +250,15 @@ export const GitCheckout = WorktreeSelector.extend({
     )
 })
 
+export const GitDeleteBranch = GitCheckout.extend({
+  // Why: `-D` is only ever requested for a branch whose patch the caller already
+  // proved is in the default branch, so the flag is optional and defaults off.
+  force: z
+    .unknown()
+    .transform((v) => v === true)
+    .pipe(z.boolean())
+})
+
 export const GitRemoteFileUrl = WorktreeSelector.extend({
   relativePath: z
     .unknown()

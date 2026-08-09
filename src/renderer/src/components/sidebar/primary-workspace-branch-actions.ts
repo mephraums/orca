@@ -11,27 +11,50 @@ export type PrimaryWorkspaceBranchActions = {
   visible: boolean
   returnToDefault: PrimaryWorkspaceBranchAction
   deleteBranchAndReturn: PrimaryWorkspaceBranchAction
+  /**
+   * Ancestry can't prove the branch is merged, but its patch is already in the
+   * default branch — `git branch -d` will refuse, so the delete must force.
+   */
+  deleteNeedsForce: boolean
 }
 
 const HIDDEN: PrimaryWorkspaceBranchActions = {
   visible: false,
   returnToDefault: { enabled: false, disabledReason: null },
-  deleteBranchAndReturn: { enabled: false, disabledReason: null }
+  deleteBranchAndReturn: { enabled: false, disabledReason: null },
+  deleteNeedsForce: false
 }
+
+const LOAD_FAILED_REASON = 'Could not read this branch. Check that the repository is reachable.'
 
 function pluralizeCommits(count: number): string {
   return count === 1 ? '1 unmerged commit' : `${count} unmerged commits`
 }
 
+function bothDisabled(reason: string): PrimaryWorkspaceBranchActions {
+  return {
+    visible: true,
+    returnToDefault: { enabled: false, disabledReason: reason },
+    deleteBranchAndReturn: { enabled: false, disabledReason: reason },
+    deleteNeedsForce: false
+  }
+}
+
 /**
  * Decide what the primary checkout's branch actions offer. Deleting is allowed
- * only when the branch is fully merged into the default branch, so the common
- * "agent opened a PR and it landed" cleanup is one click while unmerged work
- * can never be dropped from a menu.
+ * once the default branch holds the work — by ancestry, or by the squash/rebase
+ * equivalent — so the common "agent opened a PR and it landed" cleanup is one
+ * click while unmerged work can never be dropped from a menu.
  */
 export function resolvePrimaryWorkspaceBranchActions(
-  state: BranchReturnState | null
+  state: BranchReturnState | null,
+  options: { loadFailed?: boolean } = {}
 ): PrimaryWorkspaceBranchActions {
+  // Why: a failed read is shown as disabled-with-a-reason rather than hidden, so
+  // a broken repo can't look identical to "nothing to clean up".
+  if (options.loadFailed) {
+    return bothDisabled(LOAD_FAILED_REASON)
+  }
   if (!state) {
     return HIDDEN
   }
@@ -43,15 +66,11 @@ export function resolvePrimaryWorkspaceBranchActions(
   }
 
   if (state.isDirty) {
-    const dirtyReason = 'Commit or stash your changes first.'
-    return {
-      visible: true,
-      returnToDefault: { enabled: false, disabledReason: dirtyReason },
-      deleteBranchAndReturn: { enabled: false, disabledReason: dirtyReason }
-    }
+    return bothDisabled('Commit or stash your changes first.')
   }
 
-  const safeToDelete = state.isMergedIntoDefault
+  const squashMergedOnly = !state.isMergedIntoDefault && state.isSquashMergedIntoDefault
+  const safeToDelete = state.isMergedIntoDefault || squashMergedOnly
   return {
     visible: true,
     returnToDefault: { enabled: true, disabledReason: null },
@@ -62,7 +81,8 @@ export function resolvePrimaryWorkspaceBranchActions(
           disabledReason: `'${currentBranch}' has ${pluralizeCommits(
             state.unmergedCommits
           )} not in ${defaultBranch}.`
-        }
+        },
+    deleteNeedsForce: squashMergedOnly
   }
 }
 
@@ -72,6 +92,16 @@ export function describeDeleteBranchAndReturn(state: BranchReturnState | null): 
   return branch
     ? `Delete '${branch}' & return to ${state?.defaultBranch}`
     : 'Delete branch & return'
+}
+
+/**
+ * Shown on the delete action when only the squash/rebase check cleared it, so a
+ * force delete is never silent.
+ */
+export function describeForceDeleteNote(state: BranchReturnState | null): string {
+  const branch = state?.currentBranch ? `'${state.currentBranch}'` : 'This branch'
+  const defaultBranch = state?.defaultBranch ?? 'the default branch'
+  return `${branch} landed in ${defaultBranch} as a squash or rebase commit, so git still calls it unmerged — deleting uses 'git branch -D'.`
 }
 
 export function describeReturnToDefault(state: BranchReturnState | null): string {

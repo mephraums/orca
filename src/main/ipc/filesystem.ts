@@ -1308,7 +1308,7 @@ export function registerFilesystemHandlers(
     'git:deleteBranch',
     async (
       _event,
-      args: { worktreePath: string; branch: string; connectionId?: string }
+      args: { worktreePath: string; branch: string; connectionId?: string; force?: boolean }
     ): Promise<void> => {
       if (args.connectionId) {
         const provider = getSshGitProvider(args.connectionId)
@@ -1317,7 +1317,7 @@ export function registerFilesystemHandlers(
         }
         // Why: `-d` refuses unmerged branches, matching the local path's safety.
         assertValidBranchName(args.branch)
-        await provider.exec(['branch', '-d', args.branch], args.worktreePath)
+        await provider.exec(['branch', args.force ? '-D' : '-d', args.branch], args.worktreePath)
         return
       }
       const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
@@ -1326,7 +1326,7 @@ export function registerFilesystemHandlers(
         args.worktreePath,
         worktreePath
       )
-      await deleteLocalBranch(worktreePath, args.branch, gitOptions)
+      await deleteLocalBranch(worktreePath, args.branch, gitOptions, { force: args.force ?? false })
     }
   )
 

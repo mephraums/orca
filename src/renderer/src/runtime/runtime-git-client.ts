@@ -464,21 +464,24 @@ export async function checkoutRuntimeGitBranch(
 
 export async function deleteRuntimeGitBranch(
   context: RuntimeGitContext,
-  branch: string
+  branch: string,
+  options: { force?: boolean } = {}
 ): Promise<void> {
+  const force = options.force ?? false
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind === 'local' || !context.worktreeId) {
     await window.api.git.deleteBranch({
       worktreePath: resolveLocalWorktreePath(context),
       branch,
-      connectionId: context.connectionId
+      connectionId: context.connectionId,
+      force
     })
     return
   }
   await callRuntimeRpc(
     target,
     'git.deleteBranch',
-    { worktree: toRuntimeWorktreeSelector(context.worktreeId), branch },
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId), branch, force },
     { timeoutMs: 30_000 }
   )
 }

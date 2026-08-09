@@ -37,15 +37,24 @@ export async function checkoutBranch(
  * Delete a local branch. Uses `-d`, so git refuses when the branch still holds
  * unmerged commits — the caller gates on that, and this is the second line of
  * defense rather than a force delete.
+ *
+ * `force` swaps in `-D` for the one case ancestry cannot express: a squash or
+ * rebase merge landed the branch's patch under a new commit, so git still calls
+ * the branch unmerged. Callers must have proof (see `isSquashMergedIntoDefault`)
+ * before asking for it.
  */
 export async function deleteLocalBranch(
   worktreePath: string,
   branch: string,
-  options: GitRuntimeOptions = {}
+  options: GitRuntimeOptions = {},
+  { force = false }: { force?: boolean } = {}
 ): Promise<void> {
   assertValidBranchName(branch)
   await runWithGitReadCacheInvalidation(() =>
-    gitExecFileAsync(['branch', '-d', branch], gitOptionsForWorktree(worktreePath, options))
+    gitExecFileAsync(
+      ['branch', force ? '-D' : '-d', branch],
+      gitOptionsForWorktree(worktreePath, options)
+    )
   )
 }
 
