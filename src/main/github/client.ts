@@ -12,6 +12,7 @@ import type {
   PRCheckDetail,
   PRCheckRunDetails,
   GitHubCommentResult,
+  GitHubReactionContent,
   GitHubPRReviewCommentInput,
   PRComment,
   GitHubViewer,
@@ -111,7 +112,11 @@ import {
   mapPRState,
   deriveCheckStatus
 } from './mappers'
-import { mapGraphQLReactionGroups, type GitHubGraphQLReactionGroup } from './comment-reactions'
+import {
+  mapGraphQLReactionGroups,
+  toGraphQLReactionContent,
+  type GitHubGraphQLReactionGroup
+} from './comment-reactions'
 import {
   getRateLimit,
   noteRepositoryRateLimitSpend,
@@ -4318,6 +4323,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
           originalStartLine
           comments(first: 100) {
             nodes {
+              id
               databaseId
               author { __typename login avatarUrl(size: 48) }
               body
@@ -4326,6 +4332,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
               path
               reactionGroups {
                 content
+                viewerHasReacted
                 reactors {
                   totalCount
                 }
@@ -4336,6 +4343,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
       }
       comments(first: 100) {
         nodes {
+          id
           databaseId
           author { __typename login avatarUrl(size: 48) }
           body
@@ -4343,6 +4351,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
           url
           reactionGroups {
             content
+            viewerHasReacted
             reactors {
               totalCount
             }
@@ -4456,6 +4465,7 @@ export async function getPRComments(
         originalStartLine: number | null
         comments: {
           nodes: {
+            id: string
             databaseId: number
             author: { __typename?: string; login: string; avatarUrl: string } | null
             body: string
@@ -4467,6 +4477,7 @@ export async function getPRComments(
         }
       }
       type GQLIssueComment = {
+        id: string
         databaseId: number
         author: { __typename?: string; login: string; avatarUrl: string } | null
         body: string
@@ -4496,6 +4507,7 @@ export async function getPRComments(
             createdAt: c.createdAt,
             url: c.url,
             isBot: c.author?.__typename === 'Bot',
+            reactionSubjectId: c.id,
             reactions: mapGraphQLReactionGroups(c.reactionGroups)
           })
         )
@@ -4514,6 +4526,7 @@ export async function getPRComments(
               createdAt: c.createdAt,
               url: c.url,
               isBot: c.author?.__typename === 'Bot',
+              reactionSubjectId: c.id,
               reactions: mapGraphQLReactionGroups(c.reactionGroups),
               path: c.path,
               threadId: thread.id,
@@ -4589,6 +4602,62 @@ export async function getPRComments(
   } catch (err) {
     console.warn('getPRComments failed:', err)
     return []
+  } finally {
+    release()
+  }
+}
+
+export async function setPRCommentReaction(
+  repoPath: string,
+  reactionSubjectId: string,
+  content: GitHubReactionContent,
+  reacted: boolean,
+  connectionId?: string | null,
+  prRepo?: GitHubApiRepository | null,
+  localGitOptions: LocalGitExecOptions = {}
+): Promise<boolean> {
+  const mutation = reacted ? 'addReaction' : 'removeReaction'
+  const query = `mutation($subjectId: ID!, $content: ReactionContent!) {
+    ${mutation}(input: { subjectId: $subjectId, content: $content }) {
+      subject { id }
+    }
+  }`
+  const { ownerRepo, ghOptions } = await resolveGitHubRepoExecution(
+    repoPath,
+    prRepo,
+    connectionId,
+    localGitOptions
+  )
+  if (!ownerRepo) {
+    return false
+  }
+  const guard = repositoryRateLimitGuard(ownerRepo, 'graphql', ghOptions)
+  if (guard.blocked) {
+    console.warn(
+      `${mutation} skipped: GitHub GraphQL rate limit nearly exhausted (${guard.remaining}/${guard.limit})`
+    )
+    return false
+  }
+  await acquire()
+  try {
+    noteRepositoryRateLimitSpend(ownerRepo, 'graphql', 1, ghOptions)
+    await ghExecFileAsync(
+      [
+        'api',
+        'graphql',
+        '-f',
+        `query=${query}`,
+        '-f',
+        `subjectId=${reactionSubjectId}`,
+        '-f',
+        `content=${toGraphQLReactionContent(content)}`
+      ],
+      ghOptions
+    )
+    return true
+  } catch (err) {
+    console.warn(`${mutation} failed:`, err)
+    return false
   } finally {
     release()
   }
@@ -4693,6 +4762,7 @@ export async function resolveReviewThread(
 function mapReviewCommentResponse(
   data: {
     id?: number
+    node_id?: string | null
     user: { login: string; avatar_url: string; type?: string } | null
     body?: string
     created_at?: string
@@ -4708,6 +4778,7 @@ function mapReviewCommentResponse(
 ): PRComment {
   return {
     id: data.id ?? Date.now(),
+    reactionSubjectId: data.node_id?.trim() || undefined,
     author: data.user?.login ?? 'You',
     authorAvatarUrl: data.user?.avatar_url ?? '',
     body: data.body ?? body,
