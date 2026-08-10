@@ -2946,10 +2946,14 @@ export default function ChecksPanel(): React.JSX.Element {
   )
 
   const handleSetReaction = useCallback(
-    async (comment: PRComment, content: GitHubReactionContent, reacted: boolean): Promise<void> => {
+    async (
+      comment: PRComment,
+      content: GitHubReactionContent,
+      reacted: boolean
+    ): Promise<boolean> => {
       const reactionSubjectId = comment.reactionSubjectId
       if (!repo || !prNumber || !pr?.prRepo || !reactionSubjectId) {
-        return
+        return false
       }
       const requestKey = checksPanelAsyncResultKey(
         prCacheKey,
@@ -2969,7 +2973,7 @@ export default function ChecksPanel(): React.JSX.Element {
         { repoId: repo.id, prRepo: pr.prRepo }
       )
       if (!isCurrentAsyncResult(requestKey) || ok) {
-        return
+        return ok
       }
       setComments((current) =>
         restoreReactionOnSubject(current, reactionSubjectId, content, previousReaction)
@@ -2980,6 +2984,7 @@ export default function ChecksPanel(): React.JSX.Element {
           'Failed to update reaction.'
         )
       )
+      return false
     },
     [branch, isCurrentAsyncResult, pr, prCacheKey, prNumber, repo, setPRCommentReaction]
   )
