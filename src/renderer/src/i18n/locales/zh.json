@@ -4356,7 +4356,11 @@
           "switchedToBranch": "Switched to",
           "switchBranchFailed": "Could not switch branch",
           "deletedBranchAndSwitched": "Deleted branch and switched back",
-          "deleteBranchFailed": "Could not delete branch"
+          "deleteBranchFailed": "Could not delete branch",
+          "gitPull": "Pull",
+          "gitPullTooltip": "Pull the latest commits from the remote into this branch.",
+          "gitFetch": "Fetch",
+          "gitFetchTooltip": "Fetch from the remote without merging and refresh the ahead/behind counts."
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",

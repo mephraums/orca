@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
+  ArrowDownToLine,
   Copy,
   Bell,
   BellOff,
@@ -24,6 +25,7 @@ import {
   Pin,
   PinOff,
   Kanban,
+  RefreshCw,
   Trash2,
   Undo2,
   Unlink,
@@ -54,6 +56,7 @@ import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { WorktreeParentPickerPopover } from './WorktreeParentPickerPopover'
 import { getEligibleWorktreeParents } from './worktree-parent-candidates'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
+import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { translate } from '@/i18n/i18n'
 import {
   folderWorkspaceKey,
@@ -299,6 +302,8 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const moveProjectToGroup = useAppStore((s) => s.moveProjectToGroup)
   const deleteFolderWorkspace = useAppStore((s) => s.deleteFolderWorkspace)
   const setActiveWorktree = useAppStore((s) => s.setActiveWorktree)
+  const pullBranch = useAppStore((s) => s.pullBranch)
+  const fetchBranch = useAppStore((s) => s.fetchBranch)
   const repo = useRepoById(worktree.repoId)
   const deleteState = useAppStore((s) => s.deleteStateByWorktreeId[worktree.id])
   const [menuOpen, setMenuOpen] = useState(false)
@@ -349,6 +354,8 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const deleteStateByWorktreeId = useAppStore((s) =>
     selectMenuScopedMap(menuOpen, s.deleteStateByWorktreeId, EMPTY_DELETE_STATE_BY_WORKTREE_ID)
   )
+  // Why: gate behind menuOpen like the maps above — closed wrappers must stay inert to remote-op churn.
+  const isRemoteOperationActive = useAppStore((s) => menuOpen && s.isRemoteOperationActive)
   const scopeRef = useRef<HTMLDivElement>(null)
   const contextMenuOpenedAtRef = useRef<number | null>(null)
   const activeContextWorktrees = menuOpen ? contextWorktrees : effectiveSelectedWorktrees
@@ -473,6 +480,26 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleCopyPath = useCallback(() => {
     window.api.ui.writeClipboardText(worktree.path)
   }, [worktree.path])
+
+  // Why: pullBranch/fetchBranch already toast their failures; swallow the rethrow
+  // so a failed remote op doesn't surface as an unhandled rejection.
+  const handlePullBranch = useCallback(() => {
+    void pullBranch(
+      worktree.id,
+      worktree.path,
+      repo?.connectionId ?? undefined,
+      worktree.pushTarget
+    ).catch(() => undefined)
+  }, [pullBranch, repo?.connectionId, worktree.id, worktree.path, worktree.pushTarget])
+
+  const handleFetchBranch = useCallback(() => {
+    void fetchBranch(
+      worktree.id,
+      worktree.path,
+      repo?.connectionId ?? undefined,
+      worktree.pushTarget
+    ).catch(() => undefined)
+  }, [fetchBranch, repo?.connectionId, worktree.id, worktree.path, worktree.pushTarget])
 
   const handleToggleRead = useCallback(() => {
     updateWorktreeMeta(worktree.id, { isUnread: !worktree.isUnread })
@@ -789,6 +816,53 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                 <Copy className="size-3.5" />
                 {translate('auto.components.sidebar.WorktreeContextMenu.3350101edb', 'Copy Path')}
               </DropdownMenuItem>
+              {repo && isGitRepoKind(repo) && !folderWorkspaceId ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuItem
+                        onSelect={handlePullBranch}
+                        disabled={isDeleting || isRemoteOperationActive}
+                      >
+                        <ArrowDownToLine className="size-3.5" />
+                        {translate('auto.components.sidebar.WorktreeContextMenu.gitPull', 'Pull')}
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={8}
+                      className="max-w-[200px] text-pretty"
+                    >
+                      {translate(
+                        'auto.components.sidebar.WorktreeContextMenu.gitPullTooltip',
+                        'Pull the latest commits from the remote into this branch.'
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuItem
+                        onSelect={handleFetchBranch}
+                        disabled={isDeleting || isRemoteOperationActive}
+                      >
+                        <RefreshCw className="size-3.5" />
+                        {translate('auto.components.sidebar.WorktreeContextMenu.gitFetch', 'Fetch')}
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={8}
+                      className="max-w-[200px] text-pretty"
+                    >
+                      {translate(
+                        'auto.components.sidebar.WorktreeContextMenu.gitFetchTooltip',
+                        'Fetch from the remote without merging and refresh the ahead/behind counts.'
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleTogglePin} disabled={isDeleting}>
                 {worktree.isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
