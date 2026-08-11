@@ -9,6 +9,12 @@ import { useAppStore } from '@/store'
 import { getDiskBaselineSignature } from './diff-content-signature'
 import { getRuntimeFileReadScope, readRuntimeFileContent } from '@/runtime/runtime-file-client'
 import { settingsForRuntimeOwner } from '@/runtime/runtime-rpc-client'
+import { findWorkspaceFileRoute } from '@/lib/runtime-workspace-file-route'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  toRuntimeExecutionHostId,
+  toSshExecutionHostId
+} from '../../../../shared/execution-host'
 import {
   getRuntimeGitBranchDiff,
   getRuntimeGitCommitDiff,
@@ -31,6 +37,7 @@ import {
 } from './useEditorPanelExternalContentEvents'
 import { useEditorPanelFileLoadRetry } from './useEditorPanelFileLoadRetry'
 import { useLocalLogTail } from './useLocalLogTail'
+import { migrateRestoredEditorFileOwner } from './migrate-restored-editor-file-owner'
 
 const inFlightFileReads = new Map<string, Promise<FileContent>>()
 const inFlightDiffReads = new Map<string, Promise<DiffContent>>()
@@ -138,6 +145,13 @@ export function useEditorPanelContentState({
           activeSettings,
           restoredOpenFile?.runtimeEnvironmentId
         )
+        // Why: liveTail tabs are AI Vault logs discovered on this client, so the
+        // worktree's SSH owner must never be inferred for them (a stamp still routes).
+        const isLiveTailLogTab =
+          restoredOpenFile?.readOnly === true && restoredOpenFile.liveTail === true
+        let readConnectionId = connectionId
+        let readWorktreeId = worktreeId
+        let readRelativePath = restoredOpenFile?.relativePath ?? relativePath
         if (
           resolvedConnectionId === undefined &&
           !readSettings?.activeRuntimeEnvironmentId?.trim() &&
@@ -149,17 +163,61 @@ export function useEditorPanelContentState({
           throw new Error(WORKTREE_OWNER_NOT_READY_ERROR)
         }
         if (restoredOpenFile?.filePath === filePath && restoredOpenFile.relativePath === filePath) {
-          if (readSettings?.activeRuntimeEnvironmentId?.trim() || connectionId) {
-            // Why: restored external-file tabs contain client-local absolute
-            // paths. Remote runtime and SSH workspaces cannot read those paths
-            // without an explicit upload/import flow.
-            throw new Error('External local files are not available for remote workspaces.')
+          // Why: an out-of-worktree absolute path in an SSH workspace belongs to the
+          // remote host, so the resolved connection owns it even when the tab predates
+          // (or was opened outside) the terminal-link path that stamps the target id.
+          const externalSshOwnerId =
+            restoredOpenFile.externalSshTargetId?.trim() ||
+            (isLiveTailLogTab ? undefined : connectionId)
+          const runtimeEnvironmentId = isLiveTailLogTab
+            ? undefined
+            : readSettings?.activeRuntimeEnvironmentId?.trim()
+          if (isLiveTailLogTab) {
+            await window.api.fs.authorizeExternalPath({ targetPath: filePath })
+            readConnectionId = undefined
+          } else {
+            const currentState = useAppStore.getState()
+            const executionHostId = externalSshOwnerId
+              ? toSshExecutionHostId(externalSshOwnerId)
+              : runtimeEnvironmentId
+                ? toRuntimeExecutionHostId(runtimeEnvironmentId)
+                : LOCAL_EXECUTION_HOST_ID
+            const route = findWorkspaceFileRoute(currentState, executionHostId, filePath)
+            if (route && route.worktreeId !== worktreeId) {
+              const migration = await migrateRestoredEditorFileOwner(
+                id,
+                route,
+                runtimeEnvironmentId ?? null
+              )
+              fileReadGenerationRef.current[id] = ++fileReadGenerationCounterRef.current
+              if (!migration.ok) {
+                throw new Error(
+                  migration.reason === 'collision'
+                    ? 'The sibling file is already open; close one tab before restoring it.'
+                    : 'The sibling file owner changed while the tab was restoring.'
+                )
+              }
+              setFileContents((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+              return
+            }
+            if (runtimeEnvironmentId && !route) {
+              throw new Error('External local files are not available for remote workspaces.')
+            }
+            if (!externalSshOwnerId) {
+              // Why: client-local external tabs need their main-process path grant
+              // refreshed because that authorization is only held in memory.
+              await window.api.fs.authorizeExternalPath({ targetPath: filePath })
+              // Why: that grant covers the client path, so this read must stay off the
+              // worktree's SSH host.
+              readConnectionId = undefined
+            }
           }
-          // Why: restored external-file tabs need their main-process path grant
-          // refreshed because that authorization is only held in memory.
-          await window.api.fs.authorizeExternalPath({ targetPath: filePath })
         }
-        const readScope = getRuntimeFileReadScope(readSettings, connectionId)
+        const readScope = getRuntimeFileReadScope(readSettings, readConnectionId)
         const key = inFlightReadKey(readScope, filePath)
         if (options?.force) {
           // Why: forced reloads must not attach to a currently registered read
@@ -171,11 +229,11 @@ export function useEditorPanelContentState({
           pending = readRuntimeFileContent({
             settings: readSettings,
             filePath,
-            relativePath: restoredOpenFile?.relativePath ?? relativePath,
-            worktreeId,
-            connectionId,
-            includeLocalLogMetadata:
-              restoredOpenFile?.readOnly === true && restoredOpenFile.liveTail === true
+            relativePath: readRelativePath,
+            worktreeId: readWorktreeId,
+            connectionId: readConnectionId,
+            expectedExternalSshTargetId: restoredOpenFile?.externalSshTargetId,
+            includeLocalLogMetadata: isLiveTailLogTab
           }) as Promise<FileContent>
           inFlightFileReads.set(key, pending)
           queueMicrotask(() => {
@@ -314,7 +372,7 @@ export function useEditorPanelContentState({
           [file.id]: {
             kind: 'text',
             originalContent: '',
-            modifiedContent: `Error loading diff: ${err}`,
+            modifiedContent: `Error loading diff: ${String(err)}`,
             originalIsBinary: false,
             modifiedIsBinary: false
           }

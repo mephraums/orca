@@ -94,6 +94,7 @@ export const GIT_METHODS: RpcMethod[] = [
         params.includeIgnored === undefined &&
         params.bypassEffectiveUpstreamNegativeCache === undefined &&
         params.reuseLineStats === undefined &&
+        params.branchLineTotalMergeBase === undefined &&
         signal === undefined
           ? undefined
           : {
@@ -104,6 +105,9 @@ export const GIT_METHODS: RpcMethod[] = [
                 ? { bypassEffectiveUpstreamNegativeCache: true }
                 : {}),
               ...(params.reuseLineStats === true ? { reuseLineStats: true } : {}),
+              ...(params.branchLineTotalMergeBase === undefined
+                ? {}
+                : { branchLineTotalMergeBase: params.branchLineTotalMergeBase }),
               ...(signal ? { signal } : {})
             }
       return options === undefined

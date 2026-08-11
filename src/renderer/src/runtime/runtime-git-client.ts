@@ -63,6 +63,8 @@ type RuntimeDiscoverCommitMessageModelsResult =
       capability: CommitMessageAgentCapability
       models: CommitMessageModelCapability[]
       defaultModelId: string
+      /** Missing only when an older remote runtime produced the response. */
+      catalogOrigin?: 'probe' | 'spec'
     }
   | { success: false; error: string }
 
@@ -138,6 +140,7 @@ export async function getRuntimeGitStatus(
     includeIgnored?: boolean
     bypassEffectiveUpstreamNegativeCache?: boolean
     reuseLineStats?: boolean
+    branchLineTotalMergeBase?: string
     signal?: AbortSignal
   }
 ): Promise<GitStatusResult> {
@@ -147,6 +150,9 @@ export async function getRuntimeGitStatus(
     ? { bypassEffectiveUpstreamNegativeCache: true }
     : {}
   const lineStatsReuseArgs = options?.reuseLineStats ? { reuseLineStats: true } : {}
+  const branchLineTotalArgs = options?.branchLineTotalMergeBase
+    ? { branchLineTotalMergeBase: options.branchLineTotalMergeBase }
+    : {}
   if (target.kind === 'local' || !context.worktreeId) {
     return callLocalGitStatus(
       {
@@ -154,7 +160,8 @@ export async function getRuntimeGitStatus(
         connectionId: context.connectionId,
         ...includeIgnoredArgs,
         ...upstreamCacheBypassArgs,
-        ...lineStatsReuseArgs
+        ...lineStatsReuseArgs,
+        ...branchLineTotalArgs
       },
       options?.signal
     )
@@ -166,7 +173,8 @@ export async function getRuntimeGitStatus(
       worktree: toRuntimeWorktreeSelector(context.worktreeId),
       ...includeIgnoredArgs,
       ...upstreamCacheBypassArgs,
-      ...lineStatsReuseArgs
+      ...lineStatsReuseArgs,
+      ...branchLineTotalArgs
     },
     {
       timeoutMs: 15_000,
@@ -179,6 +187,24 @@ export async function getRuntimeGitStatus(
       ...(options?.reuseLineStats ? {} : { signal: options?.signal })
     }
   )
+}
+
+export async function setRuntimeGitStatusUpstreamRefWatch(
+  context: RuntimeGitContext,
+  args: { executionHostId: string; branch?: string; upstreamName?: string }
+): Promise<void> {
+  const target = getActiveRuntimeTarget(context.settings)
+  if (target.kind !== 'local' || !context.worktreeId) {
+    return
+  }
+  await window.api.git.setStatusUpstreamRefWatch({
+    worktreeId: context.worktreeId,
+    worktreePath: resolveLocalWorktreePath(context),
+    executionHostId: args.executionHostId,
+    ...(context.connectionId ? { connectionId: context.connectionId } : {}),
+    ...(args.branch ? { branch: args.branch } : {}),
+    ...(args.upstreamName ? { upstreamName: args.upstreamName } : {})
+  })
 }
 
 let nextGitStatusRequestToken = 0
@@ -712,6 +738,8 @@ export async function generateRuntimeCommitMessage(
   if (target.kind === 'local' || !context.worktreeId) {
     return window.api.git.generateCommitMessage({
       worktreePath: resolveLocalWorktreePath(context),
+      // Why: raw id — the `::workspace:<uuid>` suffix is part of the worktree meta key.
+      ...(context.worktreeId ? { worktreeId: context.worktreeId } : {}),
       repoId: context.worktreeId ? getRepoIdFromWorktreeId(context.worktreeId) : undefined,
       connectionId: context.connectionId,
       ...(overrides?.sourceControlAiResolvedParams
@@ -791,6 +819,8 @@ export async function generateRuntimePullRequestFields(
   if (target.kind === 'local' || !context.worktreeId) {
     return window.api.git.generatePullRequestFields({
       worktreePath: resolveLocalWorktreePath(context),
+      // Why: raw id — the `::workspace:<uuid>` suffix is part of the worktree meta key.
+      ...(context.worktreeId ? { worktreeId: context.worktreeId } : {}),
       repoId: context.worktreeId ? getRepoIdFromWorktreeId(context.worktreeId) : undefined,
       connectionId: context.connectionId,
       ...input,

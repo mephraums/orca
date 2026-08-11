@@ -3,7 +3,6 @@ import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 
 export const TEXT_SIZE = 17
 export const MONO_SIZE = 12
-export const MAX_TOOL_RESULT_CHARS = 4000
 
 export const styles = StyleSheet.create({
   row: {
@@ -140,6 +139,14 @@ export const styles = StyleSheet.create({
   imageRef: {
     color: colors.textSecondary,
     fontSize: TEXT_SIZE
+  },
+  imageThumb: {
+    width: 200,
+    height: 150,
+    borderRadius: radii.card,
+    backgroundColor: colors.bgRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle
   },
   diff: {
     borderRadius: radii.button,

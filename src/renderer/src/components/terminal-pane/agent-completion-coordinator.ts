@@ -471,6 +471,13 @@ export function createAgentCompletionCoordinator(
   }
 
   function handleProcessInspectionResult(result: RuntimeTerminalProcessInspection): boolean {
+    if (result.unavailable === true) {
+      // Why: unknown liveness breaks the consecutive-idle proof without erasing known agent ownership.
+      pendingProcessExitAgent = null
+      consecutiveInspectionErrors += 1
+      scheduleNextPoll()
+      return false
+    }
     consecutiveInspectionErrors = 0
     const recognized = recognizeAgentProcess(result.foregroundProcess)
     if (recognized) {
@@ -551,6 +558,8 @@ export function createAgentCompletionCoordinator(
             inspectionSucceeded = true
           }
         } catch {
+          // Why: a failed inspection breaks the consecutive-idle proof just like an unavailable result.
+          pendingProcessExitAgent = null
           consecutiveInspectionErrors += 1
         } finally {
           inspectionInFlight = false
@@ -799,6 +808,13 @@ export function createAgentCompletionCoordinator(
       // Why: a pause arriving before the quiet window must cancel a provisional 'done' so it never becomes a false completion.
       clearPendingHookDone()
       dispatchAttention(payload)
+      return
+    }
+    if (payload.state === 'done' && payload.sessionBoundary === true) {
+      // Why: a session-boundary 'done' is an idle session connecting (resume/launch/clear,
+      // STA-3386), not a completed turn — record the activity/evidence above but never
+      // complete. Pending timers stay untouched: a quiet-window done from a real prior
+      // turn must still fire.
       return
     }
     if (isCompletionHookState(payload.state)) {
