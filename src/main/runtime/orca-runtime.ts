@@ -985,6 +985,7 @@ type RuntimeStore = {
     agentStatusHooksEnabled?: GlobalSettings['agentStatusHooksEnabled']
     defaultTaskSource?: GlobalSettings['defaultTaskSource']
     defaultTaskViewPreset?: GlobalSettings['defaultTaskViewPreset']
+    hideDraftPRsInTaskList?: GlobalSettings['hideDraftPRsInTaskList']
     visibleTaskProviders?: GlobalSettings['visibleTaskProviders']
     defaultRepoSelection?: GlobalSettings['defaultRepoSelection']
     defaultLinearTeamSelection?: GlobalSettings['defaultLinearTeamSelection']
@@ -3023,6 +3024,7 @@ export class OrcaRuntimeService {
     | 'agentStatusHooksEnabled'
     | 'defaultTaskSource'
     | 'defaultTaskViewPreset'
+    | 'hideDraftPRsInTaskList'
     | 'visibleTaskProviders'
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'
@@ -3046,6 +3048,7 @@ export class OrcaRuntimeService {
       agentStatusHooksEnabled: settings.agentStatusHooksEnabled !== false,
       defaultTaskSource: settings.defaultTaskSource ?? 'github',
       defaultTaskViewPreset: settings.defaultTaskViewPreset ?? 'issues',
+      hideDraftPRsInTaskList: settings.hideDraftPRsInTaskList === true,
       visibleTaskProviders: settings.visibleTaskProviders ?? [...TASK_PROVIDERS],
       defaultRepoSelection: settings.defaultRepoSelection ?? null,
       defaultLinearTeamSelection: settings.defaultLinearTeamSelection ?? null,
@@ -3068,6 +3071,7 @@ export class OrcaRuntimeService {
       | 'agentDefaultEnv'
       | 'defaultTaskSource'
       | 'defaultTaskViewPreset'
+      | 'hideDraftPRsInTaskList'
       | 'visibleTaskProviders'
       | 'defaultRepoSelection'
       | 'defaultLinearTeamSelection'
@@ -3088,6 +3092,7 @@ export class OrcaRuntimeService {
     | 'agentStatusHooksEnabled'
     | 'defaultTaskSource'
     | 'defaultTaskViewPreset'
+    | 'hideDraftPRsInTaskList'
     | 'visibleTaskProviders'
     | 'defaultRepoSelection'
     | 'defaultLinearTeamSelection'

@@ -1812,7 +1812,10 @@
         "multiSelectAllReady": "Select all ready",
         "startOneWorkspace": "Start 1 workspace",
         "startWorkspacesCount": "Start {{value0}} workspaces",
-        "startWorkspaces": "Start workspaces"
+        "startWorkspaces": "Start workspaces",
+        "hideDraftPrsSaveFailed": "Failed to save draft PR visibility.",
+        "showDraftPrs": "Show draft PRs",
+        "hideDraftPrs": "Hide draft PRs"
       },
       "Terminal": {
         "73768427cf": "閉じる",

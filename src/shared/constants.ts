@@ -305,6 +305,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     skipDeleteAutomationConfirm: false,
     skipCodexRateLimitResetConfirm: false,
     defaultTaskViewPreset: 'all',
+    hideDraftPRsInTaskList: false,
     defaultTaskSource: 'github',
     visibleTaskProviders: [...TASK_PROVIDERS],
     visibleTaskProvidersDefaultedForJira: true,

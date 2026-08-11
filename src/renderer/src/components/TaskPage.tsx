@@ -6061,10 +6061,14 @@ export default function TaskPage(): React.JSX.Element {
 
   const currentPageItems = useMemo(() => pages[currentPage] ?? [], [pages, currentPage])
 
-  const filteredWorkItems = useMemo(
-    () => applyTypeFilter(currentPageItems),
-    [applyTypeFilter, currentPageItems]
-  )
+  // Why: client-side rather than a query qualifier — preset clicks replace the query, which would silently drop the toggle.
+  const hideDraftPRs = settings?.hideDraftPRsInTaskList ?? false
+  const filteredWorkItems = useMemo(() => {
+    const typed = applyTypeFilter(currentPageItems)
+    return hideDraftPRs && activeGithubTaskKind === 'prs'
+      ? typed.filter((item) => !isTaskPageGitHubDraftPR(item))
+      : typed
+  }, [activeGithubTaskKind, applyTypeFilter, currentPageItems, hideDraftPRs])
   const showGitHubTaskSkeletons = tasksFiltering || (tasksLoading && filteredWorkItems.length === 0)
   const loadedGitHubAuthorLogins = useMemo(() => {
     const seen = new Set<string>()
@@ -6130,6 +6134,18 @@ export default function TaskPage(): React.JSX.Element {
     setPrMultiSelectActive((active) => !active)
     setSelectedBatchPrs([])
   }, [])
+
+  const handleToggleHideDraftPRs = useCallback((): void => {
+    // Why: a durable preference like the default task view — persist it instead of only changing page state.
+    void updateSettings({ hideDraftPRsInTaskList: !hideDraftPRs }).catch(() => {
+      toast.error(
+        translate(
+          'auto.components.TaskPage.hideDraftPrsSaveFailed',
+          'Failed to save draft PR visibility.'
+        )
+      )
+    })
+  }, [hideDraftPRs, updateSettings])
 
   const handleToggleBatchPr = useCallback((item: GitHubWorkItem): void => {
     setSelectedBatchPrs((prev) => togglePrSelection(prev, item))
@@ -8439,6 +8455,57 @@ export default function TaskPage(): React.JSX.Element {
                         className="flex shrink-0 items-center gap-2"
                         data-contextual-tour-target="tasks-actions"
                       >
+                        {showPRManagementColumns ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={handleToggleHideDraftPRs}
+                                aria-pressed={hideDraftPRs}
+                                aria-label={
+                                  hideDraftPRs
+                                    ? translate(
+                                        'auto.components.TaskPage.showDraftPrs',
+                                        'Show draft PRs'
+                                      )
+                                    : translate(
+                                        'auto.components.TaskPage.hideDraftPrs',
+                                        'Hide draft PRs'
+                                      )
+                                }
+                                className={cn(
+                                  'size-8 border-border/50 backdrop-blur-md',
+                                  hideDraftPRs
+                                    ? 'border-foreground/40 bg-muted/70 text-foreground shadow-sm'
+                                    : 'bg-transparent hover:bg-muted/50 supports-[backdrop-filter]:bg-transparent'
+                                )}
+                              >
+                                <span className="relative inline-flex items-center justify-center">
+                                  <GitPullRequestDraft className="size-4" />
+                                  {hideDraftPRs ? (
+                                    // Why: lucide has no crossed-out draft glyph; a slash overlay reads as "drafts hidden".
+                                    <span
+                                      aria-hidden="true"
+                                      className="absolute h-px w-5 -rotate-45 rounded bg-current"
+                                    />
+                                  ) : null}
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" sideOffset={6}>
+                              {hideDraftPRs
+                                ? translate(
+                                    'auto.components.TaskPage.showDraftPrs',
+                                    'Show draft PRs'
+                                  )
+                                : translate(
+                                    'auto.components.TaskPage.hideDraftPrs',
+                                    'Hide draft PRs'
+                                  )}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
                         {showPRManagementColumns ? (
                           <Tooltip>
                             <TooltipTrigger asChild>

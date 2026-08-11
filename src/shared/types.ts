@@ -2831,6 +2831,8 @@ export type GlobalSettings = {
   skipCodexRateLimitResetConfirm: boolean
   /** Default preset in the new-workspace GitHub task view. */
   defaultTaskViewPreset: TaskViewPresetId
+  /** Hide draft PRs in the Tasks GitHub PR list (toolbar toggle). Client-side so it survives preset/query changes. */
+  hideDraftPRsInTaskList?: boolean
   /** Persisted last-used task source so Tasks reopens to the same provider instead of defaulting to GitHub. */
   defaultTaskSource: TaskProvider
   /** Persisted visible task providers; hides unused providers from Tasks chrome and sidebar shortcuts. */
