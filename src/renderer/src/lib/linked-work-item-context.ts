@@ -1,5 +1,5 @@
 import { buildPrWorkspacePrompt } from '../../../shared/pr-workspace-prompt'
-import type { TaskProvider } from '../../../shared/types'
+import type { TaskProvider } from '../../../shared/task-providers'
 
 export type LinkedWorkItemContext = {
   provider: TaskProvider

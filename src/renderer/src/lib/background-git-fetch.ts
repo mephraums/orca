@@ -5,7 +5,8 @@ import {
   resolveBackgroundGitFetchSettings,
   shouldFetchRepoNow
 } from '../../../shared/background-git-fetch-schedule'
-import type { Repo, Worktree } from '../../../shared/types'
+import type { Repo } from '../../../shared/repo-types'
+import type { Worktree } from '../../../shared/worktree/types'
 
 /** Last attempt per repo id, successful or not, so failures back off too. */
 const lastAttemptByRepoId = new Map<string, number>()

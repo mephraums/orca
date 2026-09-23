@@ -1,6 +1,7 @@
 import { useAppStore } from '@/store'
 import { resolvePrWorkspacePromptTemplate } from '../../../shared/pr-workspace-prompt'
-import type { GlobalSettings, Repo } from '../../../shared/types'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { Repo } from '../../../shared/repo-types'
 
 /** Effective PR prefill template: per-repo override first, then the global default. */
 export function getPrWorkspacePromptTemplate(args: {

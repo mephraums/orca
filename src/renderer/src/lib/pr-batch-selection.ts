@@ -1,4 +1,4 @@
-import type { GitHubWorkItem } from '../../../shared/types'
+import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { BatchPrWorktreeResult } from '@/lib/create-worktrees-from-prs'
 
 /** Selection identity for a PR row; repo-qualified because merged multi-repo lists reuse PR numbers. */

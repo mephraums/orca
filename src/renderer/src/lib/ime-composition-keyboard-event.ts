@@ -13,16 +13,16 @@ type ImeModifierGestureEvent = ImeKeyboardEvent & {
   shiftKey?: boolean
 }
 
-const IME_OWNED_SHORTCUT_EVENT = Symbol('imeOwnedShortcutEvent')
-
-/** True when the IME, rather than Orca, owns a keyboard event. */
-export function isImeOwnedKeyboardEvent(event: object): boolean {
-  const candidate = event as ImeKeyboardEvent
+/** True when the IME, rather than Orca, owns a keyboard event. Generic so synthetic, native, and
+ * gesture events each pass their own richer shape. */
+export function isImeOwnedKeyboardEvent<KeyEvent extends ImeKeyboardEvent>(
+  event: KeyEvent
+): boolean {
   return (
-    candidate.isComposing === true ||
-    candidate.keyCode === 229 ||
-    candidate.nativeEvent?.isComposing === true ||
-    candidate.nativeEvent?.keyCode === 229
+    event.isComposing === true ||
+    event.keyCode === 229 ||
+    event.nativeEvent?.isComposing === true ||
+    event.nativeEvent?.keyCode === 229
   )
 }
 
@@ -34,14 +34,6 @@ export function resolveImeModifierGesture(
   const marked = isImeOwnedKeyboardEvent(event)
   const owned = active || (hasModifier && marked)
   return { active: owned && hasModifier, carried: active && !marked, owned }
-}
-
-export function markImeOwnedShortcutEvent(event: object): void {
-  Object.defineProperty(event, IME_OWNED_SHORTCUT_EVENT, { value: true })
-}
-
-export function isMarkedImeOwnedShortcutEvent(event: object): boolean {
-  return (event as { [IME_OWNED_SHORTCUT_EVENT]?: boolean })[IME_OWNED_SHORTCUT_EVENT] === true
 }
 
 type ImeEnterGestureEvent = Pick<

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   DEFAULT_PR_WORKSPACE_PROMPT_TEMPLATE,
   PR_WORKSPACE_PROMPT_TOKENS,
